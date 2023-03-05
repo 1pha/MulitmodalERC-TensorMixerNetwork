@@ -1,2 +1,3 @@
-BASE_PATH: ../data/KEMDy19
-ANN_PATH: ../data/KEMDy19/annotation/
+dataset:
+  _target_: erc.datasets.KEMDy19Dataset
+  base_path: ./data/KEMDy19
