@@ -85,7 +85,7 @@ class KEMDy19Dataset(Dataset):
         else:
             for bio in ["ecg", "e4-eda", "e4-temp"]:
                 s, e = map(float, row[[f"{bio}_start", f"{bio}_end"]])
-                data[bio] = (s + e) / 2
+                data[bio] = torch.tensor((s + e) / 2, dtype=torch.float)
                 
         # Emotion
         data["emotion"] = self.str2num(row["emotion"])
