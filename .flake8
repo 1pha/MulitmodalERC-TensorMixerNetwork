@@ -1,0 +1,10 @@
+# Flake8 configuration file.
+# Remove later when FLake8 integrates with `pyproject.toml`.
+[flake8]
+count = True
+max-line-length = 100
+extend-ignore = E203
+select = E9,F63,F7,F82
+show_source = True
+statistics = True
+exclude = .git,__pycache__,.pytest_cache,.vscode,.idea,veritas9872

@@ -1,0 +1,15 @@
+name: Run flake8 & pytest
+
+on:
+  push:
+
+jobs:
+  CI:
+    name: Flake8
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run flake8 and pytest
+        run: |
+          pip install flake8
+          flake8 .
