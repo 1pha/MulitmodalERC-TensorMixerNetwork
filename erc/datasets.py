@@ -10,6 +10,7 @@ class KEMDy19Dataset(Dataset):
     wav_txt_path_fmt = "./data/KEMDy19/wav/Session{0}/Sess{0}_{1}"
     eda_path_fmt = "./data/KEMDy19/EDA/Session{0}/Original/Sess{0}{1}.csv"
 
+    # Annotation (ECG / EDA / Emotion / Valence & Arousal)
     MALE_ANN_PATH = "{}/annotation/Session*_M_*"
     FEMALE_ANN_PATH = "{}/annotation/Session*_F_*"
     TOTAL_DF_PATH = "./kemdy19.csv"
@@ -61,10 +62,8 @@ class KEMDy19Dataset(Dataset):
             "Segment ID",
             "Total Evaluation",
         ]
-        male_annotations = sorted(glob.glob(self.MALE_ANN_PATH.format(self._base_path)))
-        female_annotations = sorted(
-            glob.glob(self.FEMALE_ANN_PATH.format(self._base_path))
-        )
+        male_annotations = sorted(glob(self.MALE_ANN_PATH.format(self._base_path)))
+        female_annotations = sorted(glob(self.FEMALE_ANN_PATH.format(self._base_path)))
 
         total_df = pd.DataFrame()
         for m_ann, f_ann in zip(male_annotations, female_annotations):
