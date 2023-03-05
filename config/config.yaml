@@ -1,3 +1,4 @@
 dataset:
   _target_: erc.datasets.KEMDy19Dataset
   base_path: ./data/KEMDy19
+  generate_csv: False

@@ -1,10 +1,9 @@
 import os
-from glob import glob
 import logging
 from pathlib import Path
+from collections import OrderedDict
 
 import pandas as pd
-import omegaconf
 from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset
@@ -23,14 +22,14 @@ class KEMDy19Dataset(Dataset):
     female_annot_expr = "./annotation/Session*_F_*"
     TOTAL_DF_PATH = "./data/kemdy19.csv"
 
-    def __init__(self, base_path):
+    def __init__(self, base_path: str, generate_csv: bool):
         """
         Args:
             cfg: yaml file
         """
         logger.info("Instantiate KEMDy19 Dataset")
         self.base_path: Path = Path(base_path)
-        self.total_df: pd.DataFrame = self.processed_db()
+        self.total_df: pd.DataFrame = self.processed_db(generate_csv=generate_csv)
 
     def __len__(self):
         return len(self.total_df)
@@ -51,10 +50,10 @@ class KEMDy19Dataset(Dataset):
         sample = {"wav": None, "txt": None, "eda": None, "temp": None, "label": label}
         return sample
 
-    def processed_db(self) -> pd.DataFrame:
+    def processed_db(self, generate_csv: bool = False) -> pd.DataFrame:
         """ Reads in .csv file if exists.
         If pre-processed .csv file does NOT exists, read from data path. """
-        if not os.path.exists(self.TOTAL_DF_PATH):
+        if not os.path.exists(self.TOTAL_DF_PATH) or generate_csv:
             logger.info(f"{self.TOTAL_DF_PATH} does not exists. Process from raw data")
             total_df = self.make_total_df()
         else:
@@ -67,19 +66,22 @@ class KEMDy19Dataset(Dataset):
         return total_df
 
     def make_total_df(self) -> pd.DataFrame:
-        selected_columns = [
-            "Numb",
-            "Wav",
-            "Unnamed: 2",
-            "ECG",
-            "Unnamed: 4",
-            "E4-EDA",
-            "Unnamed: 6",
-            "E4-TEMP",
-            "Unnamed: 8",
-            "Segment ID",
-            "Total Evaluation",
-        ]
+        # .csv 상태가 나빠서 위치로 기억하는 것이 나음
+        selected_columns = OrderedDict({
+            "Numb": "Numb",
+            "Wav": "wav_start",
+            "Unnamed: 2": "wav_end",
+            "ECG": "ecg_start",
+            "Unnamed: 4": "ecg_end",
+            "E4-EDA": "e4-eda_start",
+            "Unnamed: 6": "e4-eda_end",
+            "E4-TEMP": "e4-temp_start",
+            "Unnamed: 8": "e4-temp_end",
+            "Segment ID": "segmend_id",
+            "Total Evaluation": "emotion",
+            "Unnamed: 11": "valence",
+            "Unnamed: 12": "arousal",
+        })
         male_annots = sorted(self.base_path.rglob(self.male_annot_expr))
         female_annots = sorted(self.base_path.rglob(self.female_annot_expr))
         assert (len(male_annots) > 0) & (len(female_annots) > 0),\
@@ -88,12 +90,12 @@ class KEMDy19Dataset(Dataset):
         total_df = pd.DataFrame()
         pbar = tqdm(
             iterable=zip(male_annots, female_annots),
-            desc="Processing ECG/EDA/Label",
+            desc="Processing ECG / EDA / Label",
             total=len(male_annots)
         )
         for m_ann, f_ann in pbar:
-            m_df = pd.read_csv(m_ann).dropna()[selected_columns]
-            f_df = pd.read_csv(f_ann).dropna()[selected_columns]
+            m_df = pd.read_csv(m_ann).dropna()[list(selected_columns.keys())]
+            f_df = pd.read_csv(f_ann).dropna()[list(selected_columns.keys())]
 
             # Sess01_impro03, Sess01_impro04의 TEMP와 E4-EDA값이 결측
             m_df = m_df[
@@ -114,6 +116,7 @@ class KEMDy19Dataset(Dataset):
             total_df = pd.concat([total_df, tmp_df], axis=0)
         
         logger.info(f"New dataframe saved as {self.TOTAL_DF_PATH}")
+        total_df.columns = list(selected_columns.values())
         total_df.to_csv(self.TOTAL_DF_PATH, index=False)
         return total_df
 
