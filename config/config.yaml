@@ -5,3 +5,8 @@ dataset:
   return_full_bio: False
 
   wav2vec_pretrain: facebook/wav2vec2-base-960h
+
+dataloader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 16
+  dataset: ${dataset}

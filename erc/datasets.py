@@ -60,6 +60,7 @@ class KEMDy19Dataset(Dataset):
         return len(self.total_df)
 
     def __getitem__(self, idx):
+        data = {}
         row = self.total_df.iloc[idx]
         segment_id = row["segmend_id"]
         session, script_type, speaker = segment_id.split("_")
@@ -68,11 +69,11 @@ class KEMDy19Dataset(Dataset):
 
         # Wave File
         wav_path = wav_prefix / f"{segment_id}.wav"
-        wav = self.get_wav(wav_path=wav_path)
+        data["wav"] = self.get_wav(wav_path=wav_path)
 
         # Txt File
         txt_path = wav_prefix / f"{segment_id}.txt"
-        txt = self.get_txt(txt_path=txt_path)
+        data["txt"] = self.get_txt(txt_path=txt_path)
         
         # Bio Signals
         # Currently returns average
@@ -82,23 +83,18 @@ class KEMDy19Dataset(Dataset):
             eda_path: str = self.eda_path_fmt.format(session[-2:], speaker[0])
             eda: pd.DataFrame = eda_preprocess(file_path=eda_path)
         else:
-            pass
-
+            for bio in ["ecg", "e4-eda", "e4-temp"]:
+                s, e = map(float, row[[f"{bio}_start", f"{bio}_end"]])
+                data[bio] = (s + e) / 2
+                
         # Emotion
-        emotion = self.str2num(row["emotion"])
+        data["emotion"] = self.str2num(row["emotion"])
 
         # Valence & Arousal
         valence, arousal = map(float, row[["valence", "arousal"]])
-        valence = torch.tensor(valence, dtype=torch.float)
-        arousal = torch.tensor(arousal, dtype=torch.float)
+        data["valence"] = torch.tensor(valence, dtype=torch.float)
+        data["arousal"] = torch.tensor(arousal, dtype=torch.float)
 
-        data = {
-            "wav": wav,
-            "txt": txt,
-            "emotion": emotion,
-            "valence": valence,
-            "arousal": arousal
-        }
         return data
 
     def get_wav(self, wav_path: Path | str) -> torch.Tensor:
@@ -121,7 +117,9 @@ class KEMDy19Dataset(Dataset):
             2. Which model to use
         """
         txt_path = check_exists(txt_path)
-        return
+        with open(txt_path, mode="r") as f:
+            txt = f.readlines()
+        return txt
 
     def processed_db(self, generate_csv: bool = False) -> pd.DataFrame:
         """ Reads in .csv file if exists.
