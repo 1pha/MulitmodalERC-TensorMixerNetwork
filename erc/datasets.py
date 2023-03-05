@@ -3,10 +3,15 @@ import logging
 from pathlib import Path
 from collections import OrderedDict
 
+from scipy.io import wavfile
+from transformers import AutoProcessor, Wav2Vec2Model
+import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import torch
 from torch.utils.data import Dataset
+
+from .utils import check_exists
 
 
 logger = logging.getLogger(__name__)
@@ -14,6 +19,7 @@ logger.setLevel(logging.INFO)
 
 
 class KEMDy19Dataset(Dataset):
+    dataset = "KEMDy19"
     wav_txt_path_fmt = "./data/KEMDy19/wav/Session{0}/Sess{0}_{1}"
     eda_path_fmt = "./data/KEMDy19/EDA/Session{0}/Original/Sess{0}{1}.csv"
 
@@ -22,13 +28,32 @@ class KEMDy19Dataset(Dataset):
     female_annot_expr = "./annotation/Session*_F_*"
     TOTAL_DF_PATH = "./data/kemdy19.csv"
 
-    def __init__(self, base_path: str, generate_csv: bool):
+    def __init__(
+        self,
+        base_path: str,
+        generate_csv: bool = False,
+        return_full_bio: bool = False,
+        wav2vec_pretrain: str = "facebook/wav2vec2-base-960h"
+    ):
         """
         Args:
             cfg: yaml file
+            generate_csv:
+                Flag to generate a new label.csv, default=False
+            return_full_bio:
+                Flag to call and return full ECG / EDA / TEMP data
+                Since csv in annotation directory contains start/end value of above signals,
+                this is not necessary. default=False
+            wav2vec_pretrain: str
+                Name of pretrained weights for wav2vec from huggingface
         """
         logger.info("Instantiate KEMDy19 Dataset")
         self.base_path: Path = Path(base_path)
+        self.return_full_bio = return_full_bio
+
+        self.processor = AutoProcessor.from_pretrained(wav2vec_pretrain)
+        self.model = Wav2Vec2Model.from_pretrained(wav2vec_pretrain)
+
         self.total_df: pd.DataFrame = self.processed_db(generate_csv=generate_csv)
 
     def __len__(self):
@@ -36,19 +61,67 @@ class KEMDy19Dataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.total_df.iloc[idx]
-        session, script_type, speaker = row["Segment ID"].split("_")
+        segment_id = row["segmend_id"]
+        session, script_type, speaker = segment_id.split("_")
+        # prefix: 'KEMDy19/wav/Session01/Sess01_impro01'
+        wav_prefix = Path(self.wav_txt_path_fmt.format(session[-2:], script_type))
 
-        label = self.str2num(row["Total Evaluation"])
-        wav_txt_path = self.wav_txt_path_fmt.format(session[-2:], script_type)
-        # wav
-        # 'KEMDy19/wav/Session01/Sess01_impro01' # wav, txt
-        eda_path = self.eda_path_fmt.format(session[-2:], speaker[0])
+        # Wave File
+        wav_path = wav_prefix / f"{segment_id}.wav"
+        wav = self.get_wav(wav_path=wav_path)
 
-        X = torch.tensor(self.X[idx], dtype=torch.float)
-        label = torch.tensor([label], dtype=torch.long)
+        # Txt File
+        txt_path = wav_prefix / f"{segment_id}.txt"
+        txt = self.get_txt(txt_path=txt_path)
+        
+        # Bio Signals
+        # Currently returns average
+        if self.return_full_bio:
+            # Contains full eda
+            # TODO WIP
+            eda_path: str = self.eda_path_fmt.format(session[-2:], speaker[0])
+            eda: pd.DataFrame = eda_preprocess(file_path=eda_path)
+        else:
+            pass
 
-        sample = {"wav": None, "txt": None, "eda": None, "temp": None, "label": label}
-        return sample
+        # Emotion
+        emotion = self.str2num(row["emotion"])
+
+        # Valence & Arousal
+        valence, arousal = map(float, row[["valence", "arousal"]])
+        valence = torch.tensor(valence, dtype=torch.float)
+        arousal = torch.tensor(arousal, dtype=torch.float)
+
+        data = {
+            "wav": wav,
+            "txt": txt,
+            "emotion": emotion,
+            "valence": valence,
+            "arousal": arousal
+        }
+        return data
+
+    def get_wav(self, wav_path: Path | str) -> torch.Tensor:
+        """ Get output feature vector from pre-trained wav2vec model
+        XXX: Embedding outside dataset, to fine-tune pre-trained model? See Issue
+        """
+        wav_path = check_exists(wav_path)
+        sampling_rate, data = wavfile.read(wav_path)
+        inputs = self.processor(data, sampling_rate=sampling_rate, return_tensors="pt")
+        with torch.no_grad():
+            outputs = self.model(inputs["input_values"].float())
+            outputs = outputs.last_hidden_state
+        return outputs.squeeze()
+
+    def get_txt(self, txt_path: Path | str) -> torch.Tensor:
+        """ Get output feature vector from pre-trained txt model
+        TODO:
+            1. How to process special cases: /o /l 
+                -> They _maybe_ processed by pre-trained toeknizers
+            2. Which model to use
+        """
+        txt_path = check_exists(txt_path)
+        return
 
     def processed_db(self, generate_csv: bool = False) -> pd.DataFrame:
         """ Reads in .csv file if exists.
@@ -121,7 +194,7 @@ class KEMDy19Dataset(Dataset):
         return total_df
 
     @staticmethod
-    def str2num(key) -> int:
+    def str2num(key: str) -> torch.Tensor:
         emotion2idx = {
             "surprise": 1,
             "fear": 2,
@@ -131,4 +204,30 @@ class KEMDy19Dataset(Dataset):
             "sad": 6,
             "disgust": 7,
         }
-        return emotion2idx.get(key, 0)
+        emotion = emotion2idx.get(key, 0)
+        return torch.tensor(emotion, dtype=torch.long)
+
+
+def eda_preprocess(file_path: str) -> pd.DataFrame:
+    """ on_bad_line이 있어서 (column=4 or  3으로 일정하지 않아) 4줄로 통일 하는 함수 """
+    columns = ["EDA_value", "a", "b", "Segment ID"]
+
+    with open(file_path, "r") as f:
+        lines = f.readlines()
+
+    new_lines = []
+    for line in tqdm(lines):
+        line = line.rstrip()
+        if len(line.split(",")) <= 3:
+            line += ",None"  # 4줄로 만들어주기 .
+        new_lines.append(line.split(","))
+
+    return pd.DataFrame(new_lines, columns=columns).replace("None", np.nan).dropna()
+
+
+if __name__=="__main__":
+    dataset = KEMDy19Dataset(base_path="~/codespace/etri-erc/data/KEMDy19",
+                             generate_csv=True,
+                             return_full_bio=False,
+                             wav2vec_pretrain="facebook/wav2vec2-base-960h")
+    print(dataset[0])

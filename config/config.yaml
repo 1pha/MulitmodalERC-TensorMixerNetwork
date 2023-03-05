@@ -2,3 +2,6 @@ dataset:
   _target_: erc.datasets.KEMDy19Dataset
   base_path: ./data/KEMDy19
   generate_csv: False
+  return_full_bio: False
+
+  wav2vec_pretrain: facebook/wav2vec2-base-960h

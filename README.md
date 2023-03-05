@@ -20,3 +20,14 @@ Data contains 3 modalities
 ```
 
 Put data and source codes on the same hierarchy. Prevent hard copy and use soft-link: `ln -s ACTUAL_DATA_PATH data`
+
+### Pre-trained Models
+
+#### `.wav`
+
+[wav2vec](https://huggingface.co/models?sort=downloads&search=wav2vec)
+
+#### `.txt`
+
+[Korean Pre-trained Survey](https://arxiv.org/pdf/2112.03014.pdf)
+[Huggingface Hub](https://huggingface.co/models?language=ko&sort=downloads)
