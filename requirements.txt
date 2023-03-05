@@ -1,0 +1,8 @@
+black
+jupyter
+ipykernel
+pandas
+numpy
+hydra-core
+matplotlib
+seaborn
