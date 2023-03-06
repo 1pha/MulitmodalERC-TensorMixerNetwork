@@ -46,13 +46,14 @@ class KEMDy19Dataset(Dataset):
                 this is not necessary. default=False
             wav2vec_pretrain: str
                 Name of pretrained weights for wav2vec from huggingface
+                If None / False given, return raw data from scipy.io
         """
         logger.info("Instantiate KEMDy19 Dataset")
         self.base_path: Path = Path(base_path)
         self.return_full_bio = return_full_bio
 
-        self.processor = AutoProcessor.from_pretrained(wav2vec_pretrain)
-        self.model = Wav2Vec2Model.from_pretrained(wav2vec_pretrain)
+        self.processor = AutoProcessor.from_pretrained(wav2vec_pretrain) if wav2vec_pretrain else None
+        self.model = Wav2Vec2Model.from_pretrained(wav2vec_pretrain) if wav2vec_pretrain else None
 
         self.total_df: pd.DataFrame = self.processed_db(generate_csv=generate_csv)
 
@@ -97,17 +98,20 @@ class KEMDy19Dataset(Dataset):
 
         return data
 
-    def get_wav(self, wav_path: Path | str) -> torch.Tensor:
+    def get_wav(self, wav_path: Path | str) -> torch.Tensor | np.ndarray:
         """ Get output feature vector from pre-trained wav2vec model
         XXX: Embedding outside dataset, to fine-tune pre-trained model? See Issue
         """
         wav_path = check_exists(wav_path)
         sampling_rate, data = wavfile.read(wav_path)
-        inputs = self.processor(data, sampling_rate=sampling_rate, return_tensors="pt")
-        with torch.no_grad():
-            outputs = self.model(inputs["input_values"].float())
-            outputs = outputs.last_hidden_state
-        return outputs.squeeze()
+        if self.processor and self.model:
+            inputs = self.processor(data, sampling_rate=sampling_rate, return_tensors="pt")
+            with torch.no_grad():
+                outputs = self.model(inputs["input_values"].float())
+                outputs = outputs.last_hidden_state
+            return outputs.squeeze()
+        else:
+            return data
 
     def get_txt(self, txt_path: Path | str) -> torch.Tensor:
         """ Get output feature vector from pre-trained txt model

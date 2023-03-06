@@ -4,7 +4,7 @@ dataset:
   generate_csv: False
   return_full_bio: False
 
-  wav2vec_pretrain: facebook/wav2vec2-base-960h
+  wav2vec_pretrain: False
 
 dataloader:
   _target_: torch.utils.data.DataLoader
