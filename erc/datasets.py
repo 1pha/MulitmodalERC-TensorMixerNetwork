@@ -95,6 +95,8 @@ class KEMDy19Dataset(Dataset):
         data["valence"] = torch.tensor(valence, dtype=torch.float)
         data["arousal"] = torch.tensor(arousal, dtype=torch.float)
 
+        # Man-Female
+        data["gender"] = self.gender2num(speaker[0]) # Sess01_script01_F003
         return data
 
     def get_wav(self, wav_path: Path | str) -> torch.Tensor | np.ndarray:
@@ -200,7 +202,15 @@ class KEMDy19Dataset(Dataset):
         }
         emotion = emotion2idx.get(key, 0)
         return torch.tensor(emotion, dtype=torch.long)
-
+    
+    @staticmethod
+    def gender2num(key: str) -> torch.Tensor:
+        gender2idx = {
+            "M": 0,
+            "F": 1,
+        }
+        gender = gender2idx.get(key, 0)
+        return torch.tensor(gender, dtype=torch.long)
 
 def eda_preprocess(file_path: str) -> pd.DataFrame:
     """ on_bad_line이 있어서 (column=4 or  3으로 일정하지 않아) 4줄로 통일 하는 함수 """
