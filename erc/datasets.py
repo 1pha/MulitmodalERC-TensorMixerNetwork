@@ -30,7 +30,8 @@ class KEMDBase(Dataset):
     ):
         """
         Args:
-            cfg: yaml file
+            base_path:
+                Only used when csv is not found. Optional
             generate_csv:
                 Flag to generate a new label.csv, default=False
             return_bio:
@@ -46,6 +47,8 @@ class KEMDBase(Dataset):
                     - Fold 2: Session 9 - 12
                     - Fold 3: Session 13 - 16
                     - Fold 4: Session 17 - 20
+            mode:
+                Train / valid / test mode.
         """
         logger.info("Instantiate %s Dataset", self.NAME)
         self.base_path: Path = Path(base_path)
@@ -156,25 +159,6 @@ class KEMDBase(Dataset):
         loc = ~sessions.isin(fold_range) if mode == RunMode.TRAIN else sessions.isin(fold_range)
         return total_df.loc[loc]
     
-    def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:
-        """ """
-        n = len(segment_id.split("_"))
-        if n == 3:
-            # KEMDy19
-            # segment_id: Sess01_script01_M001
-            session, script_type, speaker = segment_id.split("_")
-            # prefix: 'KEMDy19/wav/Session01/Sess01_impro01'
-            wav_prefix = Path(self.WAV_PATH_FMT.format(session[-2:], script_type))
-            gender = speaker[0]
-        elif n == 4:
-            # KEMDy20_v1_1
-            # segment_id: Sess01_script01_User002M_001
-            session, _, speaker, _ = segment_id.split("_")
-            # prefix: 'KEMDy20_v1_1/wav/Session01'
-            wav_prefix = Path(self.WAV_PATH_FMT.format(session[-2:]))
-            gender = speaker[-1]
-        return session, speaker, gender, wav_prefix
-    
     def str2num(self, key: str) -> torch.Tensor:
         emotion = emotion2idx.get(key, 0)
         return torch.tensor(emotion, dtype=torch.long)
@@ -182,6 +166,11 @@ class KEMDBase(Dataset):
     def gender2num(self, key: str) -> torch.Tensor:
         gender = gender2idx.get(key, 0)
         return torch.tensor(gender, dtype=torch.long)
+    
+    def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:
+        """ Parse `segment_id` into useful information 
+        This varies across dataset. Needs to be implemented for `__getitem__` method """
+        raise NotImplementedError
     
 
 class KEMDy19Dataset(KEMDBase):
@@ -210,6 +199,15 @@ class KEMDy19Dataset(KEMDBase):
             mode
         )
 
+    def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:
+        """ KEMDy19
+            segment_id: Sess01_script01_M001
+            prefix: 'KEMDy19/wav/Session01/Sess01_impro01'
+        """
+        session, script_type, speaker = segment_id.split("_")
+        wav_prefix = Path(self.WAV_PATH_FMT.format(session[-2:], script_type))
+        gender = speaker[0]
+        return session, speaker, gender, wav_prefix
 
 class KEMDy20Dataset(KEMDBase):
     NAME = "KEMDy20"
@@ -238,6 +236,17 @@ class KEMDy20Dataset(KEMDBase):
             mode
         )
 
+    def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:
+        """
+        KEMDy20_v1_1
+            segment_id: Sess01_script01_User002M_001
+            prefix: 'KEMDy20_v1_1/wav/Session01'
+        """
+        session, _, speaker, _ = segment_id.split("_")
+        wav_prefix = Path(self.WAV_PATH_FMT.format(session[-2:]))
+        gender = speaker[-1]
+        return session, speaker, gender, wav_prefix
+
 
 class KEMDDataset(Dataset):
     """ Integrated dataset for KEMDy19 and KEMDy20_v1_1 """
@@ -258,9 +267,6 @@ class KEMDDataset(Dataset):
             return self.kemdy19.__getitem__(idx)
         else:
             return self.kemdy20.__getitem__(idx - len(self.kemdy19))
-
-
-
 
 
 if __name__=="__main__":
