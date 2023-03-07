@@ -1,7 +1,19 @@
 import os
 from pathlib import Path
+import logging
+import time
 
 from torch import nn
+
+
+def get_logger(filehandler: bool = False):
+    logging.basicConfig()
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    if filehandler:
+        fname = f"{time.strftime('%Y%m%d-%H%M', time.localtime())}.log"
+        logger.addHandler(logging.FileHandler(filename=fname))
+    return logger
 
 
 def check_exists(path: str | Path) -> str | Path:
