@@ -167,61 +167,6 @@ class KEMDy19Dataset(Dataset):
         loc = ~sessions.isin(fold_range) if mode == RunMode.TRAIN else sessions.isin(fold_range)
         return total_df.loc[loc]
 
-    def make_total_df(self) -> pd.DataFrame:
-        # .csv 상태가 나빠서 위치로 기억하는 것이 나음
-        selected_columns = OrderedDict({
-            "Numb": "Numb",
-            "Wav": "wav_start",
-            "Unnamed: 2": "wav_end",
-            "ECG": "ecg_start",
-            "Unnamed: 4": "ecg_end",
-            "E4-EDA": "e4-eda_start",
-            "Unnamed: 6": "e4-eda_end",
-            "E4-TEMP": "e4-temp_start",
-            "Unnamed: 8": "e4-temp_end",
-            "Segment ID": "segmend_id",
-            "Total Evaluation": "emotion",
-            "Unnamed: 11": "valence",
-            "Unnamed: 12": "arousal",
-        })
-        male_annots = sorted(self.base_path.rglob(self.male_annot_expr))
-        female_annots = sorted(self.base_path.rglob(self.female_annot_expr))
-        assert (len(male_annots) > 0) & (len(female_annots) > 0),\
-            f"Annotations does not exists. Check {self.base_path / self.male_annot_expr}"
-
-        total_df = pd.DataFrame()
-        pbar = tqdm(
-            iterable=zip(male_annots, female_annots),
-            desc="Processing ECG / EDA / Label",
-            total=len(male_annots)
-        )
-        for m_ann, f_ann in pbar:
-            m_df = pd.read_csv(m_ann).dropna()[list(selected_columns.keys())]
-            f_df = pd.read_csv(f_ann).dropna()[list(selected_columns.keys())]
-
-            # Sess01_impro03, Sess01_impro04의 TEMP와 E4-EDA값이 결측
-            m_df = m_df[
-                ~(m_df["Segment ID"].str.contains("Sess01_impro03"))
-                & ~(m_df["Segment ID"].str.contains("Sess01_impro04"))
-            ]
-            f_df = f_df[
-                ~(f_df["Segment ID"].str.contains("Sess01_impro03"))
-                & ~(f_df["Segment ID"].str.contains("Sess01_impro04"))
-            ]
-
-            # 각 발화의 성별에 대한 감정만 추출
-            m_df = m_df[m_df["Segment ID"].str.contains("M")]
-            f_df = f_df[f_df["Segment ID"].str.contains("F")]
-
-            # 다시 합쳐서 정렬
-            tmp_df = pd.concat([m_df, f_df], axis=0).sort_values("Numb")
-            total_df = pd.concat([total_df, tmp_df], axis=0)
-        
-        logger.info(f"New dataframe saved as {self.TOTAL_DF_PATH}")
-        total_df.columns = list(selected_columns.values())
-        total_df.to_csv(self.TOTAL_DF_PATH, index=False)
-        return total_df
-
     @staticmethod
     def str2num(key: str) -> torch.Tensor:
         emotion2idx = {
