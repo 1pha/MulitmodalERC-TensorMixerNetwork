@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 import torch
 from torch.utils.data import Dataset
 
-from .utils import check_exists
+from .utils import check_exists, make_total_df
 
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ class KEMDy19Dataset(Dataset):
         base_path: str,
         generate_csv: bool = False,
         return_full_bio: bool = False,
+        validation_fold: int = 4,
     ):
         """
         Args:
@@ -42,12 +43,25 @@ class KEMDy19Dataset(Dataset):
                 Flag to call and return full ECG / EDA / TEMP data
                 Since csv in annotation directory contains start/end value of above signals,
                 this is not necessary. default=False
+            validation_fold:
+                Indicates validation fold.
+                Fold split is based on Session number
+                i.e. 
+                    - Fold 0: Session 1 - 4
+                    - Fold 1: Session 5 - 8
+                    - Fold 2: Session 9 - 12
+                    - Fold 3: Session 13 - 16
+                    - Fold 4: Session 17 - 20
         """
         logger.info("Instantiate KEMDy19 Dataset")
         self.base_path: Path = Path(base_path)
         self.return_full_bio = return_full_bio
+        assert isinstance(validation_fold, int) and validation_fold in range(0, 5),\
+            f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
+        self.validation_fold = validation_fold
 
-        self.total_df: pd.DataFrame = self.processed_db(generate_csv=generate_csv)
+        self.total_df: pd.DataFrame = self.processed_db(generate_csv=generate_csv,
+                                                        fold_num=validation_fold)
 
     def __len__(self):
         return len(self.total_df)
@@ -112,7 +126,7 @@ class KEMDy19Dataset(Dataset):
             txt = f.readlines()
         return txt
 
-    def processed_db(self, generate_csv: bool = False) -> pd.DataFrame:
+    def processed_db(self, generate_csv: bool = False, fold_num: int = 4) -> pd.DataFrame:
         """ Reads in .csv file if exists.
         If pre-processed .csv file does NOT exists, read from data path. """
         if not os.path.exists(self.TOTAL_DF_PATH) or generate_csv:
@@ -125,7 +139,16 @@ class KEMDy19Dataset(Dataset):
                 logger.error(f"{self.TOTAL_DF_PATH} seems to be empty")
                 logger.exception(e)
                 total_df = None
-        return total_df
+        
+        df = self.split_folds(total_df=total_df, fold_num=fold_num)
+        return df
+    
+    def split_folds(self, total_df: pd.DataFrame, fold_num: int) -> pd.DataFrame:
+        sessions: pd.Series = total_df["segment_id"].apply(lambda s: s.split("_")[0][:-2])
+        sessions = sessions.astype(int)
+        breakpoint()
+        
+
 
     def make_total_df(self) -> pd.DataFrame:
         # .csv 상태가 나빠서 위치로 기억하는 것이 나음
