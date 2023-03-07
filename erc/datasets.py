@@ -74,19 +74,20 @@ class KEMDy19Dataset(Dataset):
         session, script_type, speaker = segment_id.split("_")
         # prefix: 'KEMDy19/wav/Session01/Sess01_impro01'
         wav_prefix = Path(self.wav_txt_path_fmt.format(session[-2:], script_type))
+        wav_path = wav_prefix / f"{segment_id}.wav"
+        txt_path = wav_prefix / f"{segment_id}.txt"
         if not os.path.exists(wav_path) or not os.path.exists(txt_path):
             # Pre-checking data existence
+            # TODO This should be dealed! Not a good behavior
             print('Error occurs -> ', wav_prefix)
             return data
 
         # Wave File
-        wav_path = wav_prefix / f"{segment_id}.wav"
         sampling_rate, wav = self.get_wav(wav_path=wav_path)
         data["sampling_rate"] = sampling_rate
         data["wav"] = wav
         
         # Txt File
-        txt_path = wav_prefix / f"{segment_id}.txt"
         data["txt"] = self.get_txt(txt_path=txt_path)
         
         # Bio Signals
