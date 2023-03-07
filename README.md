@@ -12,15 +12,15 @@ Data contains 3 modalities
 
 ## Code
 ### Basic Setups
-
 ```bash
 (base) conda create -n erc python=3.10
+(base) conda activate erc
+(erc) conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia 
 (erc) pip install -r requirements.txt
-(erc) pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+# (erc) pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
 ```
 
 Put data and source codes on the same hierarchy. Prevent hard copy and use soft-link: `ln -s ACTUAL_DATA_PATH data`
-
 ### Pre-trained Models
 
 #### `.wav`
