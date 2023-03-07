@@ -62,12 +62,17 @@ class KEMDy19Dataset(Dataset):
 
         # Wave File
         wav_path = wav_prefix / f"{segment_id}.wav"
-        sampling_rate, wav = self.get_wav(wav_path=wav_path)
-        data["sampling_rate"] = sampling_rate
-        data["wav"] = wav
 
         # Txt File
         txt_path = wav_prefix / f"{segment_id}.txt"
+        if not os.path.exists(wav_path) or not os.path.exists(txt_path):
+            print('Error occurs -> ', wav_prefix)
+            return data
+        
+
+        sampling_rate, wav = self.get_wav(wav_path=wav_path)
+        data["sampling_rate"] = sampling_rate
+        data["wav"] = wav
         data["txt"] = self.get_txt(txt_path=txt_path)
         
         # Bio Signals
@@ -90,6 +95,8 @@ class KEMDy19Dataset(Dataset):
         data["valence"] = torch.tensor(valence, dtype=torch.float)
         data["arousal"] = torch.tensor(arousal, dtype=torch.float)
 
+        # Man-Female
+        data["gender"] = self.gender2num(speaker[0]) # Sess01_script01_F003
         return data
 
     def get_wav(self, wav_path: Path | str) -> torch.Tensor | np.ndarray:
@@ -195,7 +202,15 @@ class KEMDy19Dataset(Dataset):
         }
         emotion = emotion2idx.get(key, 0)
         return torch.tensor(emotion, dtype=torch.long)
-
+    
+    @staticmethod
+    def gender2num(key: str) -> torch.Tensor:
+        gender2idx = {
+            "M": 1,
+            "F": 2,
+        }
+        gender = gender2idx.get(key, 0)
+        return torch.tensor(gender, dtype=torch.long)
 
 def eda_preprocess(file_path: str) -> pd.DataFrame:
     """ on_bad_line이 있어서 (column=4 or  3으로 일정하지 않아) 4줄로 통일 하는 함수 """

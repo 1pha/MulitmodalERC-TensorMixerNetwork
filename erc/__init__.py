@@ -1,3 +1,3 @@
-from datasets import KEMDy19Dataset, eda_preprocess
+from .eda_utils import drawing_ellipse, split_df_by_gender
 
-__all__ = ["KEMDy19Dataset", "eda_preprocess"]
+__all__ = ["drawing_ellipse", "split_df_by_gender"]
