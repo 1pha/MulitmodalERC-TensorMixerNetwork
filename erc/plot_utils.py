@@ -5,7 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 
-from .constants import emotion2idx
+from erc.constants import emotion2idx
 
 
 def drawing_ellipse(total_dict: dict, 

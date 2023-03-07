@@ -15,12 +15,21 @@ Data contains 3 modalities
 ```bash
 (base) conda create -n erc python=3.10
 (base) conda activate erc
-(erc) pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
-(erc) pip install -r requirements.txt
-# (erc) pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+(erc) chmod +x ./setup.sh
+(erc) ./setup.sh
 ```
 
 Put data and source codes on the same hierarchy. Prevent hard copy and use soft-link: `ln -s ACTUAL_DATA_PATH data`
+
+### Testing Functions
+
+One may need to test a specific function on CLI. Writing an extra script for such temporal task is very nagging. Use `fire` library to boost-up productivity.
+
+For example, if one needs to test [`preprocess.make_total_df`](erc/preprocess.py) on CLI, try the following -
+```bash
+(erc) python -m fire erc.preprocess make_total_df --base_path="./data/KEMDy19"
+```
+
 ### Pre-trained Models
 
 #### `.wav`

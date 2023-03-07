@@ -3,8 +3,8 @@ from pathlib import Path
 import pandas as pd
 from tqdm.auto import tqdm
 
-from .utils import get_logger
-from .constants import selected_columns
+from erc.utils import get_logger
+from erc.constants import selected_columns
 
 
 logger = get_logger()
@@ -34,6 +34,8 @@ def make_total_df(
     # Annotation (ECG / EDA / Emotion / Valence & Arousal)
     male_annot_expr = "./annotation/Session*_M_*"
     female_annot_expr = "./annotation/Session*_F_*"
+
+    base_path, save_path = Path(base_path), Path(save_path)
 
     male_annots = sorted(base_path.rglob(male_annot_expr))
     female_annots = sorted(base_path.rglob(female_annot_expr))

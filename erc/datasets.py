@@ -10,9 +10,9 @@ from tqdm.auto import tqdm
 import torch
 from torch.utils.data import Dataset
 
-from .preprocess import make_total_df, get_folds
-from .utils import check_exists, get_logger
-from .constants import RunMode
+from erc.preprocess import make_total_df, get_folds
+from erc.utils import check_exists, get_logger
+from erc.constants import RunMode
 
 
 logger = get_logger()
