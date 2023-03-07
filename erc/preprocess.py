@@ -43,7 +43,7 @@ def make_total_df(
     total_df = pd.DataFrame()
     pbar = tqdm(
         iterable=zip(male_annots, female_annots),
-        desc="Processing ECG / EDA / Label",
+        desc=f"Processing ECG / EDA / Label from {base_path}",
         total=len(male_annots)
     )
     for m_ann, f_ann in pbar:

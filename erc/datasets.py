@@ -23,9 +23,6 @@ class KEMDy19Dataset(Dataset):
     wav_txt_path_fmt = "./data/KEMDy19/wav/Session{0}/Sess{0}_{1}"
     eda_path_fmt = "./data/KEMDy19/EDA/Session{0}/Original/Sess{0}{1}.csv"
 
-    # Annotation (ECG / EDA / Emotion / Valence & Arousal)
-    male_annot_expr = "./annotation/Session*_M_*"
-    female_annot_expr = "./annotation/Session*_F_*"
     TOTAL_DF_PATH = "./data/kemdy19.csv"
 
     def __init__(
@@ -71,30 +68,29 @@ class KEMDy19Dataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        data = {}
+        data = dict()
         row = self.df.iloc[idx]
         segment_id = row["segment_id"]
         session, script_type, speaker = segment_id.split("_")
         # prefix: 'KEMDy19/wav/Session01/Sess01_impro01'
         wav_prefix = Path(self.wav_txt_path_fmt.format(session[-2:], script_type))
+        if not os.path.exists(wav_path) or not os.path.exists(txt_path):
+            # Pre-checking data existence
+            print('Error occurs -> ', wav_prefix)
+            return data
 
         # Wave File
         wav_path = wav_prefix / f"{segment_id}.wav"
-
-        # Txt File
-        txt_path = wav_prefix / f"{segment_id}.txt"
-        if not os.path.exists(wav_path) or not os.path.exists(txt_path):
-            print('Error occurs -> ', wav_prefix)
-            return data
-        
-
         sampling_rate, wav = self.get_wav(wav_path=wav_path)
         data["sampling_rate"] = sampling_rate
         data["wav"] = wav
+        
+        # Txt File
+        txt_path = wav_prefix / f"{segment_id}.txt"
         data["txt"] = self.get_txt(txt_path=txt_path)
         
         # Bio Signals
-        # Currently returns average
+        # Currently returns average signals across time elapse
         if self.return_full_bio:
             # Contains full eda
             # TODO WIP
