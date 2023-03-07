@@ -1,15 +1,16 @@
-import pandas as pd
-
 from collections import defaultdict
 
-import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 
+from .constants import emotion2idx
 
-def drawing_ellipse(total_dict:dict, 
-                    title:str='Ellipse Sampling (All)',
-                    color_palette=sns.color_palette("Set2")) -> None:
+
+def drawing_ellipse(total_dict: dict, 
+                    title: str = 'Ellipse Sampling (All)',
+                    color_palette = sns.color_palette("Set2")) -> None:
     """
     patches.Ellipse(
        xy = (5, 5), # xy xy coordinates of ellipse centre.
@@ -20,19 +21,21 @@ def drawing_ellipse(total_dict:dict,
        linestyle = 'solid', 
        fill = True,
        facecolor = 'yellow',
-   ))
+     ))
     """
-    fig, ax = plt.subplots(figsize=(5, 5))
-    
+    _, ax = plt.subplots(figsize=(5, 5))
     for idx, emotion in enumerate(total_dict.keys()):
         tmp_dict = total_dict[emotion]
-        x,y, width, hight  = tmp_dict.values()
+        x,y, width, height = tmp_dict.values()
 
-        tmp = Ellipse((x,y), width, hight,
-                    color=color_palette[idx],
-                    fill = False,
-                    label=emotion,alpha=0.9) # Ellipse (x,y), width,  hight 
-        ax.add_artist(tmp)
+        ell = Ellipse(xy=(x, y),
+                      width=width,
+                      height=height,
+                      color=color_palette[idx],
+                      fill=False,
+                      label=emotion,
+                      alpha=0.9)
+        ax.add_artist(ell)
     ax.set_xlim((1, 5))
     ax.set_ylim((1, 5))
     ax.legend()
@@ -42,10 +45,11 @@ def drawing_ellipse(total_dict:dict,
     plt.grid()
     plt.show()
 
-def split_df_by_gender(df: pd.DataFrame, total:bool=True):
+
+def split_df_by_gender(df: pd.DataFrame, total:bool = True):
     """
     Args:
-        total: True all gender , False sperate into Female Male 
+        total: True all gender, False sperate into Female Male 
     """
     if total:
         return generate_eva_dict(df)
@@ -55,24 +59,14 @@ def split_df_by_gender(df: pd.DataFrame, total:bool=True):
         return male_dict, female_dict
 
 
-def generate_eva_dict(df_: pd.DataFrame)->dict:
+def generate_eva_dict(df_: pd.DataFrame) -> dict:
     """
     Summary: 
         감정 별 Valence Arousal mean, std 
-
     """
-    emotion_r= { 
-    1: 'surprise',
-    2: 'fear',
-    3: 'angry',
-    4: 'neutral',
-    5: 'happy',
-    6: 'sad',
-    7: 'disgust'}
     choice_col = ['valence','arousal']
     mean_std_dict = defaultdict(dict)
     for emotion_idx in df_['emotion'].unique():
-        # emotion = i
         means = df_[df_['emotion'] == emotion_idx][choice_col].mean(axis=0).values
         stds = df_[df_['emotion'] == emotion_idx][choice_col].std(axis=0).values
 
@@ -82,5 +76,5 @@ def generate_eva_dict(df_: pd.DataFrame)->dict:
             'valence_std' : stds[0],
             'arousal_std': stds[1]
         }
-        mean_std_dict[emotion_r.get(emotion_idx)] = tmp_dict
+        mean_std_dict[emotion2idx.get(emotion_idx)] = tmp_dict
     return mean_std_dict
