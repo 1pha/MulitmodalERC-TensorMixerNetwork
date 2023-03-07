@@ -206,8 +206,8 @@ class KEMDy19Dataset(Dataset):
     @staticmethod
     def gender2num(key: str) -> torch.Tensor:
         gender2idx = {
-            "M": 0,
-            "F": 1,
+            "M": 1,
+            "F": 2,
         }
         gender = gender2idx.get(key, 0)
         return torch.tensor(gender, dtype=torch.long)
