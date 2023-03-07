@@ -1,7 +1,6 @@
 import os
-import logging
 from pathlib import Path
-from collections import OrderedDict
+from typing import Tuple
 
 from scipy.io import wavfile
 import numpy as np
@@ -10,26 +9,22 @@ from tqdm.auto import tqdm
 import torch
 from torch.utils.data import Dataset
 
-from erc.preprocess import get_folds, merge_csv_kemdy19
+from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20
 from erc.utils import check_exists, get_logger
-from erc.constants import RunMode
+from erc.constants import RunMode, emotion2idx, gender2idx
 
 
 logger = get_logger()
 
 
-class KEMDy19Dataset(Dataset):
-    dataset = "KEMDy19"
-    wav_txt_path_fmt = "./data/KEMDy19/wav/Session{0}/Sess{0}_{1}"
-    eda_path_fmt = "./data/KEMDy19/EDA/Session{0}/Original/Sess{0}{1}.csv"
-
-    TOTAL_DF_PATH = "./data/kemdy19.csv"
-
+class KEMDBase(Dataset):
+    """ Abstract class base for KEMD dataset """
+    NUM_FOLDS = 5
     def __init__(
         self,
         base_path: str,
         generate_csv: bool = False,
-        return_full_bio: bool = False,
+        return_bio: bool = False,
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN
     ):
@@ -38,7 +33,7 @@ class KEMDy19Dataset(Dataset):
             cfg: yaml file
             generate_csv:
                 Flag to generate a new label.csv, default=False
-            return_full_bio:
+            return_bio:
                 Flag to call and return full ECG / EDA / TEMP data
                 Since csv in annotation directory contains start/end value of above signals,
                 this is not necessary. default=False
@@ -52,9 +47,9 @@ class KEMDy19Dataset(Dataset):
                     - Fold 3: Session 13 - 16
                     - Fold 4: Session 17 - 20
         """
-        logger.info("Instantiate KEMDy19 Dataset")
+        logger.info("Instantiate %s Dataset", self.NAME)
         self.base_path: Path = Path(base_path)
-        self.return_full_bio = return_full_bio
+        self.return_bio = return_bio
         # This assertion is subject to change: number of folds to split
         assert isinstance(validation_fold, int) and validation_fold in range(0, 5),\
             f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
@@ -67,13 +62,12 @@ class KEMDy19Dataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
         data = dict()
         row = self.df.iloc[idx]
         segment_id = row["segment_id"]
-        session, script_type, speaker = segment_id.split("_")
-        # prefix: 'KEMDy19/wav/Session01/Sess01_impro01'
-        wav_prefix = Path(self.wav_txt_path_fmt.format(session[-2:], script_type))
+        session, speaker, gender, wav_prefix = self.parse_segment_id(segment_id=segment_id)
+        
         wav_path = wav_prefix / f"{segment_id}.wav"
         txt_path = wav_prefix / f"{segment_id}.txt"
         if not os.path.exists(wav_path) or not os.path.exists(txt_path):
@@ -88,16 +82,11 @@ class KEMDy19Dataset(Dataset):
         data["wav"] = wav
         
         # Txt File
-        data["txt"] = self.get_txt(txt_path=txt_path)
+        data["txt"] = self.get_txt(txt_path=txt_path, encoding=self.TEXT_ENCODING)
         
         # Bio Signals
         # Currently returns average signals across time elapse
-        if self.return_full_bio:
-            # Contains full eda
-            # TODO WIP
-            eda_path: str = self.eda_path_fmt.format(session[-2:], speaker[0])
-            eda: pd.DataFrame = eda_preprocess(file_path=eda_path)
-        else:
+        if self.return_bio:
             for bio in ["ecg", "e4-eda", "e4-temp"]:
                 s, e = map(float, row[[f"{bio}_start", f"{bio}_end"]])
                 data[bio] = torch.tensor((s + e) / 2, dtype=torch.float)
@@ -111,7 +100,7 @@ class KEMDy19Dataset(Dataset):
         data["arousal"] = torch.tensor(arousal, dtype=torch.float)
 
         # Man-Female
-        data["gender"] = self.gender2num(speaker[0]) # Sess01_script01_F003
+        data["gender"] = self.gender2num(gender) # Sess01_script01_F003
         return data
 
     def get_wav(self, wav_path: Path | str) -> torch.Tensor | np.ndarray:
@@ -122,15 +111,18 @@ class KEMDy19Dataset(Dataset):
         sampling_rate, data = wavfile.read(wav_path)
         return sampling_rate, data
 
-    def get_txt(self, txt_path: Path | str) -> torch.Tensor:
+    def get_txt(self, txt_path: Path | str, encoding: str = None) -> torch.Tensor:
         """ Get output feature vector from pre-trained txt model
+        :parameters:
+            txt_path: Path to text in Sessions
+            encoding: For KEMDy19, None. For KEMDy20_v1_1, cp949
         TODO:
             1. How to process special cases: /o /l 
                 -> They _maybe_ processed by pre-trained toeknizers
             2. Which model to use
         """
         txt_path = check_exists(txt_path)
-        with open(txt_path, mode="r") as f:
+        with open(txt_path, mode="r", encoding=encoding) as f:
             txt = f.readlines()
         return txt
 
@@ -139,7 +131,7 @@ class KEMDy19Dataset(Dataset):
         If pre-processed .csv file does NOT exists, read from data path. """
         if not os.path.exists(self.TOTAL_DF_PATH) or generate_csv:
             logger.info(f"{self.TOTAL_DF_PATH} does not exists. Process from raw data")
-            total_df = merge_csv_kemdy19(base_path=self.base_path, save_path=self.TOTAL_DF_PATH)
+            total_df = self.merge_csv(base_path=self.base_path, save_path=self.TOTAL_DF_PATH)
         else:
             try:
                 total_df = pd.read_csv(self.TOTAL_DF_PATH)
@@ -159,55 +151,122 @@ class KEMDy19Dataset(Dataset):
     ) -> pd.DataFrame:
         sessions: pd.Series = total_df["segment_id"].apply(lambda s: s.split("_")[0][-2:])
         sessions = sessions.apply(int)
-        fold_dict: dict = get_folds(num_session=20, num_folds=5)
+        fold_dict: dict = get_folds(num_session=self.NUM_SESSIONS, num_folds=self.NUM_FOLDS)
         fold_range: range = fold_dict[fold_num]
         loc = ~sessions.isin(fold_range) if mode == RunMode.TRAIN else sessions.isin(fold_range)
         return total_df.loc[loc]
-
-    @staticmethod
-    def str2num(key: str) -> torch.Tensor:
-        emotion2idx = {
-            "surprise": 1,
-            "fear": 2,
-            "angry": 3,
-            "neutral": 4,
-            "happy": 5,
-            "sad": 6,
-            "disgust": 7,
-        }
+    
+    def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:
+        """ """
+        n = len(segment_id.split("_"))
+        if n == 3:
+            # KEMDy19
+            # segment_id: Sess01_script01_M001
+            session, script_type, speaker = segment_id.split("_")
+            # prefix: 'KEMDy19/wav/Session01/Sess01_impro01'
+            wav_prefix = Path(self.WAV_PATH_FMT.format(session[-2:], script_type))
+            gender = speaker[0]
+        elif n == 4:
+            # KEMDy20_v1_1
+            # segment_id: Sess01_script01_User002M_001
+            session, _, speaker, _ = segment_id.split("_")
+            # prefix: 'KEMDy20_v1_1/wav/Session01'
+            wav_prefix = Path(self.WAV_PATH_FMT.format(session[-2:]))
+            gender = speaker[-1]
+        return session, speaker, gender, wav_prefix
+    
+    def str2num(self, key: str) -> torch.Tensor:
         emotion = emotion2idx.get(key, 0)
         return torch.tensor(emotion, dtype=torch.long)
     
-    @staticmethod
-    def gender2num(key: str) -> torch.Tensor:
-        gender2idx = {
-            "M": 1,
-            "F": 2,
-        }
+    def gender2num(self, key: str) -> torch.Tensor:
         gender = gender2idx.get(key, 0)
         return torch.tensor(gender, dtype=torch.long)
+    
 
-def eda_preprocess(file_path: str) -> pd.DataFrame:
-    """ on_bad_line이 있어서 (column=4 or  3으로 일정하지 않아) 4줄로 통일 하는 함수 """
-    columns = ["EDA_value", "a", "b", "Segment ID"]
+class KEMDy19Dataset(KEMDBase):
+    NAME = "KEMDy19"
+    WAV_PATH_FMT = "./data/KEMDy19/wav/Session{0}/Sess{0}_{1}"
+    EDA_PATH_FMT = "./data/KEMDy19/EDA/Session{0}/Original/Sess{0}{1}.csv"
 
-    with open(file_path, "r") as f:
-        lines = f.readlines()
+    NUM_SESSIONS = 20
+    TOTAL_DF_PATH = "./data/kemdy19.csv"
+    TEXT_ENCODING: str = None
 
-    new_lines = []
-    for line in tqdm(lines):
-        line = line.rstrip()
-        if len(line.split(",")) <= 3:
-            line += ",None"  # 4줄로 만들어주기 .
-        new_lines.append(line.split(","))
+    merge_csv: callable = merge_csv_kemdy19
+    def __init__(
+        self,
+        base_path: str = "./data/KEMDy19",
+        generate_csv: bool = False,
+        return_bio: bool = True,
+        validation_fold: int = 4,
+        mode: RunMode | str = RunMode.TRAIN
+    ):
+        super(KEMDy19Dataset, self).__init__(
+            base_path,
+            generate_csv,
+            return_bio,
+            validation_fold,
+            mode
+        )
 
-    return pd.DataFrame(new_lines, columns=columns).replace("None", np.nan).dropna()
+
+class KEMDy20Dataset(KEMDBase):
+    NAME = "KEMDy20"
+    WAV_PATH_FMT = "./data/KEMDy20_v1_1/wav/Session{0}"
+    # Not used yet
+    EDA_PATH_FMT = "./data/KEMDy20v_1_1/EDA/Session{0}/Original/Sess{0}{1}.csv"
+
+    NUM_SESSIONS = 40
+    TOTAL_DF_PATH = "./data/kemdy20.csv"
+    TEXT_ENCODING: str = "cp949"
+
+    merge_csv: callable = merge_csv_kemdy20
+    def __init__(
+        self,
+        base_path: str = "./data/KEMDy20_v1_1",
+        generate_csv: bool = False,
+        return_bio: bool = False,
+        validation_fold: int = 4,
+        mode: RunMode | str = RunMode.TRAIN
+    ):
+        super(KEMDy20Dataset, self).__init__(
+            base_path,
+            generate_csv,
+            return_bio,
+            validation_fold,
+            mode
+        )
+
+
+class KEMDDataset(Dataset):
+    """ Integrated dataset for KEMDy19 and KEMDy20_v1_1 """
+    def __init__(
+        self,
+        return_bio: bool = False,
+        validation_fold: int = 4,
+        mode: RunMode | str = RunMode.TRAIN
+    ):
+        self.kemdy19 = KEMDy19Dataset(return_bio=return_bio, validation_fold=validation_fold, mode=mode)
+        self.kemdy20 = KEMDy20Dataset(return_bio=return_bio, validation_fold=validation_fold, mode=mode)
+
+    def __len__(self):
+        return len(self.kemdy19) + len(self.kemdy20)
+
+    def __getitem__(self, idx):
+        if idx < len(self.kemdy19):
+            return self.kemdy19.__getitem__(idx)
+        else:
+            return self.kemdy20.__getitem__(idx - len(self.kemdy19))
+
+
+
 
 
 if __name__=="__main__":
-    dataset = KEMDy19Dataset(base_path="~/codespace/etri-erc/data/KEMDy19",
+    dataset = KEMDy20Dataset(base_path="./data/KEMDy20_v1_1",
                              generate_csv=True,
-                             return_full_bio=False,
+                             return_bio=False,
                              validation_fold=4,
                              mode="train")
     print(dataset[0])

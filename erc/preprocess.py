@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 from tqdm.auto import tqdm
 
 from erc.utils import get_logger
@@ -22,6 +23,23 @@ def get_folds(num_session: int = 20, num_folds = 5) -> dict:
         e = s + num_sessions[f]
         fold_dict[f] = range(s + 1, e + 1) # Because sessions starts from 1
     return fold_dict
+
+
+def eda_preprocess(file_path: str) -> pd.DataFrame:
+    """ on_bad_line이 있어서 (column=4 or  3으로 일정하지 않아) 4줄로 통일 하는 함수 """
+    columns = ["EDA_value", "a", "b", "Segment ID"]
+
+    with open(file_path, "r") as f:
+        lines = f.readlines()
+
+    new_lines = []
+    for line in tqdm(lines):
+        line = line.rstrip()
+        if len(line.split(",")) <= 3:
+            line += ",None"  # 4줄로 만들어주기 .
+        new_lines.append(line.split(","))
+
+    return pd.DataFrame(new_lines, columns=columns).replace("None", np.nan).dropna()
 
 
 def merge_csv_kemdy19(

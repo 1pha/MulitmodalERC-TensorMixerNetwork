@@ -20,6 +20,12 @@ emotion2idx = {
     "disgust": 7,
 }
 
+# Gender Mapper
+gender2idx = {
+    "M": 1,
+    "F": 2,
+}
+
 # Column names to be chosen from annotations .csv
 columns_kemdy19 = OrderedDict({
     "Numb": "Numb",
@@ -37,15 +43,6 @@ columns_kemdy19 = OrderedDict({
     "Unnamed: 12": "arousal",
 })
 
-columns_kemdy20 = OrderedDict({
-    "Numb": "Numb",
-    "Wav": "wav_start",
-    "Unnamed: 2": "wav_end",
-    "Segment ID": "segment_id",
-    "Total Evaluation": "emotion",
-    "Unnamed: 5": "valence",
-    "Unnamed: 6": "arousal",
-})
 columns_kemdy20 = OrderedDict({
     0: "Numb",
     1: "wav_start",
