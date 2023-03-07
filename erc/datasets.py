@@ -62,12 +62,17 @@ class KEMDy19Dataset(Dataset):
 
         # Wave File
         wav_path = wav_prefix / f"{segment_id}.wav"
-        sampling_rate, wav = self.get_wav(wav_path=wav_path)
-        data["sampling_rate"] = sampling_rate
-        data["wav"] = wav
 
         # Txt File
         txt_path = wav_prefix / f"{segment_id}.txt"
+        if not os.path.exists(wav_path) or not os.path.exists(txt_path):
+            print('Error occurs -> ', wav_prefix)
+            return data
+        
+
+        sampling_rate, wav = self.get_wav(wav_path=wav_path)
+        data["sampling_rate"] = sampling_rate
+        data["wav"] = wav
         data["txt"] = self.get_txt(txt_path=txt_path)
         
         # Bio Signals
@@ -197,7 +202,7 @@ class KEMDy19Dataset(Dataset):
         return torch.tensor(emotion, dtype=torch.long)
 
 
-def eda_preprocess(file_path: str) -> pd.DataFrame:
+def eda_preprocess(file_path: str) → pd.DataFrame:
     """ on_bad_line이 있어서 (column=4 or  3으로 일정하지 않아) 4줄로 통일 하는 함수 """
     columns = ["EDA_value", "a", "b", "Segment ID"]
 
