@@ -21,7 +21,7 @@ emotion2idx = {
 }
 
 # Column names to be chosen from annotations .csv
-selected_columns = OrderedDict({
+columns_kemdy19 = OrderedDict({
     "Numb": "Numb",
     "Wav": "wav_start",
     "Unnamed: 2": "wav_end",
@@ -35,4 +35,23 @@ selected_columns = OrderedDict({
     "Total Evaluation": "emotion",
     "Unnamed: 11": "valence",
     "Unnamed: 12": "arousal",
+})
+
+columns_kemdy20 = OrderedDict({
+    "Numb": "Numb",
+    "Wav": "wav_start",
+    "Unnamed: 2": "wav_end",
+    "Segment ID": "segment_id",
+    "Total Evaluation": "emotion",
+    "Unnamed: 5": "valence",
+    "Unnamed: 6": "arousal",
+})
+columns_kemdy20 = OrderedDict({
+    0: "Numb",
+    1: "wav_start",
+    2: "wav_end",
+    3: "segment_id",
+    4: "emotion",
+    5: "valence",
+    6: "arousal",
 })

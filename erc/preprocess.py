@@ -4,7 +4,7 @@ import pandas as pd
 from tqdm.auto import tqdm
 
 from erc.utils import get_logger
-from erc.constants import selected_columns
+from erc.constants import columns_kemdy19, columns_kemdy20
 
 
 logger = get_logger()
@@ -24,12 +24,13 @@ def get_folds(num_session: int = 20, num_folds = 5) -> dict:
     return fold_dict
 
 
-def make_total_df(
+def merge_csv_kemdy19(
     base_path: str | Path = "./data/KEMDy19",
     save_path: str | Path = "./data/kemdy19.csv",
 ) -> pd.DataFrame:
     """ Merges all .csv files to create integrated single dataframe for all segments and sessions.
     Iterates `base_path` annotation directory and reads in seperated csvs.
+    Note that this will always overwrite csv file on save_path (no handlings)
     """
     # Annotation (ECG / EDA / Emotion / Valence & Arousal)
     male_annot_expr = "./annotation/Session*_M_*"
@@ -46,11 +47,11 @@ def make_total_df(
     pbar = tqdm(
         iterable=zip(male_annots, female_annots),
         desc=f"Processing ECG / EDA / Label from {base_path}",
-        total=len(male_annots)
+        total=min(len(male_annots), len(female_annots))
     )
     for m_ann, f_ann in pbar:
-        m_df = pd.read_csv(m_ann).dropna()[list(selected_columns.keys())]
-        f_df = pd.read_csv(f_ann).dropna()[list(selected_columns.keys())]
+        m_df = pd.read_csv(m_ann).dropna()[list(columns_kemdy19.keys())]
+        f_df = pd.read_csv(f_ann).dropna()[list(columns_kemdy19.keys())]
 
         # Sess01_impro03, Sess01_impro04의 TEMP와 E4-EDA값이 결측
         m_df = m_df[
@@ -71,6 +72,39 @@ def make_total_df(
         total_df = pd.concat([total_df, tmp_df], axis=0)
     
     logger.info(f"New dataframe saved as {save_path}")
-    total_df.columns = list(selected_columns.values())
+    total_df.columns = list(columns_kemdy19.values())
+    total_df.to_csv(save_path, index=False)
+    return total_df
+
+
+def merge_csv_kemdy20(
+    base_path: str | Path = "./data/KEMDy20_v1_1",
+    save_path: str | Path = "./data/kemdy20.csv",
+) -> pd.DataFrame:
+    """ Merges all .csv files to create integrated single dataframe for all segments and sessions.
+    Iterates `base_path` annotation directory and reads in seperated csvs.
+    Note that this will always overwrite csv file on save_path (no handlings)
+    
+    Since behavior of two datasets KEMDy19 and KEMDy20_v1_1 is different,
+    function was unfortuantely diverged.
+    """
+    # Annotation (ECG / EDA / Emotion / Valence & Arousal)
+    base_path, save_path = Path(base_path), Path(save_path)
+    annot_fmt = "annotation/*.csv"
+    annots = sorted(base_path.rglob(annot_fmt))
+    assert len(annots) > 0, f"Annotations does not exists. Check {base_path / annot_fmt}"
+
+    total_df = pd.DataFrame()
+    pbar = tqdm(
+        iterable=annots,
+        desc=f"Processing {base_path}",
+        total=len(annots)
+    )
+    for ann in pbar:
+        df = pd.read_csv(ann).dropna().iloc[1:, list(columns_kemdy20.keys())]
+        total_df = pd.concat([total_df, df], axis=0).sort_values("Numb")
+    
+    logger.info(f"New dataframe saved as {save_path}")
+    total_df.columns = list(columns_kemdy20.values())
     total_df.to_csv(save_path, index=False)
     return total_df

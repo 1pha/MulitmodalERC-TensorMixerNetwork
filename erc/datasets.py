@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 import torch
 from torch.utils.data import Dataset
 
-from erc.preprocess import make_total_df, get_folds
+from erc.preprocess import get_folds, merge_csv_kemdy19
 from erc.utils import check_exists, get_logger
 from erc.constants import RunMode
 
@@ -139,7 +139,7 @@ class KEMDy19Dataset(Dataset):
         If pre-processed .csv file does NOT exists, read from data path. """
         if not os.path.exists(self.TOTAL_DF_PATH) or generate_csv:
             logger.info(f"{self.TOTAL_DF_PATH} does not exists. Process from raw data")
-            total_df = make_total_df(base_path=self.base_path, save_path=self.TOTAL_DF_PATH)
+            total_df = merge_csv_kemdy19(base_path=self.base_path, save_path=self.TOTAL_DF_PATH)
         else:
             try:
                 total_df = pd.read_csv(self.TOTAL_DF_PATH)
