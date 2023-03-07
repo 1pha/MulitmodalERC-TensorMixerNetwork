@@ -3,6 +3,8 @@ dataset:
   base_path: ./data/KEMDy19
   generate_csv: False
   return_full_bio: False
+  validation_fold: 4
+  mode: train
 
 dataloader:
   _target_: torch.utils.data.DataLoader

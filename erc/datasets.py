@@ -10,11 +10,12 @@ from tqdm.auto import tqdm
 import torch
 from torch.utils.data import Dataset
 
-from .utils import check_exists, make_total_df
+from .preprocess import make_total_df, get_folds
+from .utils import check_exists, get_logger
+from .constants import RunMode
 
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = get_logger()
 
 
 class KEMDy19Dataset(Dataset):
@@ -33,6 +34,7 @@ class KEMDy19Dataset(Dataset):
         generate_csv: bool = False,
         return_full_bio: bool = False,
         validation_fold: int = 4,
+        mode: RunMode | str = RunMode.TRAIN
     ):
         """
         Args:
@@ -56,20 +58,22 @@ class KEMDy19Dataset(Dataset):
         logger.info("Instantiate KEMDy19 Dataset")
         self.base_path: Path = Path(base_path)
         self.return_full_bio = return_full_bio
+        # This assertion is subject to change: number of folds to split
         assert isinstance(validation_fold, int) and validation_fold in range(0, 5),\
             f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
         self.validation_fold = validation_fold
+        self.mode = RunMode[mode.upper()] if isinstance(mode, str) else mode
 
-        self.total_df: pd.DataFrame = self.processed_db(generate_csv=generate_csv,
-                                                        fold_num=validation_fold)
+        self.df: pd.DataFrame = self.processed_db(generate_csv=generate_csv,
+                                                  fold_num=validation_fold)
 
     def __len__(self):
-        return len(self.total_df)
+        return len(self.df)
 
     def __getitem__(self, idx):
         data = {}
-        row = self.total_df.iloc[idx]
-        segment_id = row["segmend_id"]
+        row = self.df.iloc[idx]
+        segment_id = row["segment_id"]
         session, script_type, speaker = segment_id.split("_")
         # prefix: 'KEMDy19/wav/Session01/Sess01_impro01'
         wav_prefix = Path(self.wav_txt_path_fmt.format(session[-2:], script_type))
@@ -131,7 +135,7 @@ class KEMDy19Dataset(Dataset):
         If pre-processed .csv file does NOT exists, read from data path. """
         if not os.path.exists(self.TOTAL_DF_PATH) or generate_csv:
             logger.info(f"{self.TOTAL_DF_PATH} does not exists. Process from raw data")
-            total_df = self.make_total_df()
+            total_df = make_total_df(base_path=self.base_path, save_path=self.TOTAL_DF_PATH)
         else:
             try:
                 total_df = pd.read_csv(self.TOTAL_DF_PATH)
@@ -140,15 +144,21 @@ class KEMDy19Dataset(Dataset):
                 logger.exception(e)
                 total_df = None
         
-        df = self.split_folds(total_df=total_df, fold_num=fold_num)
+        df = self.split_folds(total_df=total_df, fold_num=fold_num, mode=self.mode)
         return df
     
-    def split_folds(self, total_df: pd.DataFrame, fold_num: int) -> pd.DataFrame:
-        sessions: pd.Series = total_df["segment_id"].apply(lambda s: s.split("_")[0][:-2])
-        sessions = sessions.astype(int)
-        breakpoint()
-        
-
+    def split_folds(
+        self,
+        total_df: pd.DataFrame,
+        fold_num: int,
+        mode: RunMode | str = RunMode.TRAIN,
+    ) -> pd.DataFrame:
+        sessions: pd.Series = total_df["segment_id"].apply(lambda s: s.split("_")[0][-2:])
+        sessions = sessions.apply(int)
+        fold_dict: dict = get_folds(num_session=20, num_folds=5)
+        fold_range: range = fold_dict[fold_num]
+        loc = ~sessions.isin(fold_range) if mode == RunMode.TRAIN else sessions.isin(fold_range)
+        return total_df.loc[loc]
 
     def make_total_df(self) -> pd.DataFrame:
         # .csv 상태가 나빠서 위치로 기억하는 것이 나음
@@ -241,5 +251,6 @@ if __name__=="__main__":
     dataset = KEMDy19Dataset(base_path="~/codespace/etri-erc/data/KEMDy19",
                              generate_csv=True,
                              return_full_bio=False,
-                             wav2vec_pretrain="facebook/wav2vec2-base-960h")
+                             validation_fold=4,
+                             mode="train")
     print(dataset[0])
