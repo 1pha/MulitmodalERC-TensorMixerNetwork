@@ -5,7 +5,6 @@ from typing import Tuple
 from scipy.io import wavfile
 import numpy as np
 import pandas as pd
-from tqdm.auto import tqdm
 import torch
 from torch.utils.data import Dataset
 

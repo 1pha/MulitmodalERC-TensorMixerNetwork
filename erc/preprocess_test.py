@@ -1,6 +1,6 @@
 from itertools import chain
 
-from .preprocess import get_folds
+from erc.preprocess import get_folds
 
 
 def _test_fold_split(num_session, num_folds, gt_sess: list):
