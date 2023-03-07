@@ -202,7 +202,7 @@ class KEMDy19Dataset(Dataset):
         return torch.tensor(emotion, dtype=torch.long)
 
 
-def eda_preprocess(file_path: str) → pd.DataFrame:
+def eda_preprocess(file_path: str) -> pd.DataFrame:
     """ on_bad_line이 있어서 (column=4 or  3으로 일정하지 않아) 4줄로 통일 하는 함수 """
     columns = ["EDA_value", "a", "b", "Segment ID"]
 
