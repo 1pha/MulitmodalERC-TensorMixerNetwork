@@ -2,6 +2,7 @@ from itertools import chain
 
 from .preprocess import get_folds
 
+
 def _test_fold_split(num_session, num_folds, gt_sess: list):
     """ Test if `get_folds` function with followings
     1. Different sessions, different folds

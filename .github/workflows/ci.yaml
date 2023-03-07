@@ -11,6 +11,6 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run flake8 and pytest
         run: |
-          pip install flake8 pytest
+          pip install -r requirements.txt
           flake8 .
           pytest -s
