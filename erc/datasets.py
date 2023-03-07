@@ -209,6 +209,7 @@ class KEMDy19Dataset(KEMDBase):
         gender = speaker[0]
         return session, speaker, gender, wav_prefix
 
+
 class KEMDy20Dataset(KEMDBase):
     NAME = "KEMDy20"
     WAV_PATH_FMT = "./data/KEMDy20_v1_1/wav/Session{0}"
