@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 import torchaudio
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, Wav2Vec2Processor
 
 from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20
 from erc.utils import check_exists, get_logger
@@ -30,6 +30,7 @@ class KEMDBase(Dataset):
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
         validation_fold: int = 4,
+        processor_name: str = 'kresnik/wav2vec2-large-xlsr-korean',
         mode: RunMode | str = RunMode.TRAIN
     ):
         """
@@ -69,6 +70,7 @@ class KEMDBase(Dataset):
 
         self.df: pd.DataFrame = self.processed_db(generate_csv=generate_csv,
                                                   fold_num=validation_fold)
+        self.processor = Wav2Vec2Processor.from_pretrained(processor_name)
 
     def __len__(self):
         return len(self.df)
@@ -166,6 +168,10 @@ class KEMDBase(Dataset):
         wav_path = check_exists(wav_path)
         # sampling_rate, data = wavfile.read(wav_path)
         data, sampling_rate = torchaudio.load(wav_path)
+        data = self.processor(data, 
+                             sampling_rate=sampling_rate,
+                             return_tensors="pt",
+                             return_attention_mask = False)['input_values']
         data, mask = self.pad_value(data.squeeze(), max_length=self.max_length_wav)
         return sampling_rate, data, mask
 
