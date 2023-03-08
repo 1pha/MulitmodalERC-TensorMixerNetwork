@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+import torchaudio
 from transformers import AutoTokenizer
 
 from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20
@@ -163,7 +164,8 @@ class KEMDBase(Dataset):
         XXX: Embedding outside dataset, to fine-tune pre-trained model? See Issue
         """
         wav_path = check_exists(wav_path)
-        sampling_rate, data = wavfile.read(wav_path)
+        # sampling_rate, data = wavfile.read(wav_path)
+        data, sampling_rate = torchaudio.load(wav_path)
         data, mask = self.pad_value(data, max_length=self.max_length_wav)
         return sampling_rate, data, mask
 
