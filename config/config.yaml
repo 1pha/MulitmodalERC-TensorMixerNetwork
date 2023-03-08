@@ -1,6 +1,9 @@
 dataset:
   _target_: erc.datasets.KEMDDataset
   return_bio: False
+  max_length_wav: 200_000
+  max_length_txt: 50
+  tokenizer_name: klue/bert-base
   validation_fold: 4
   mode: train
 
