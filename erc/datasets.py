@@ -73,6 +73,29 @@ class KEMDBase(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx: int):
+        """ Returns data dictionary.
+        Element specifications
+            sampling_rate:
+                int (e.g. 16_000)
+            wav:
+                torch.int16
+                ndim=1, (max_length_wav,)
+            wav_mask:
+                torch.int64
+                ndim=1, (max_length_wav,)
+            txt:
+                torch.int64
+                ndim=1, (max_length_txt,)
+            txt_mask:
+                torch.int64
+                ndim=1, (max_length_txt,)
+            emotion, gender:
+                torch.int64
+                ndim=0
+            valence, arousal:
+                torch.float32
+                ndim=0
+        """
         data = dict()
         row = self.df.iloc[idx]
         segment_id = row["segment_id"]
@@ -87,12 +110,15 @@ class KEMDBase(Dataset):
             return data
 
         # Wave File
-        sampling_rate, wav = self.get_wav(wav_path=wav_path)
+        sampling_rate, wav, wav_mask = self.get_wav(wav_path=wav_path)
         data["sampling_rate"] = sampling_rate
         data["wav"] = wav
+        data["wav_mask"] = wav_mask
         
         # Txt File
-        data["txt"] = self.get_txt(txt_path=txt_path, encoding=self.TEXT_ENCODING)
+        txt, txt_mask = self.get_txt(txt_path=txt_path, encoding=self.TEXT_ENCODING)
+        data["txt"] = txt
+        data["txt_mask"] = txt_mask
         
         # Bio Signals
         # Currently returns average signals across time elapse
@@ -118,16 +144,19 @@ class KEMDBase(Dataset):
         arr: torch.Tensor,
         max_length: int,
         pad_value: int | float = 0,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """ Assumes single data """
         if not isinstance(arr, torch.Tensor):
             arr = torch.tensor(arr)
         
+        mask = torch.ones(max_length).long()
         if len(arr) >= max_length:
             arr = arr[:max_length]
         else:
-            arr = torch.nn.functional.pad(arr, pad=(0, max_length - len(arr)), value=pad_value)
-        return arr
+            null_size = max_length - len(arr)
+            arr = torch.nn.functional.pad(arr, pad=(0, null_size), value=pad_value)
+            mask[null_size:] = 0
+        return arr, mask
 
     def get_wav(self, wav_path: Path | str) -> torch.Tensor | np.ndarray:
         """ Get output feature vector from pre-trained wav2vec model
@@ -135,10 +164,10 @@ class KEMDBase(Dataset):
         """
         wav_path = check_exists(wav_path)
         sampling_rate, data = wavfile.read(wav_path)
-        data = self.pad_value(data, max_length=self.max_length_wav)
-        return sampling_rate, data
+        data, mask = self.pad_value(data, max_length=self.max_length_wav)
+        return sampling_rate, data, mask
 
-    def get_txt(self, txt_path: Path | str, encoding: str = None) -> torch.Tensor:
+    def get_txt(self, txt_path: Path | str, encoding: str = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """ Get output feature vector from pre-trained txt model
         :parameters:
             txt_path: Path to text in Sessions
@@ -153,12 +182,15 @@ class KEMDBase(Dataset):
             txt: list = f.readlines()
         # We assume there is a single line
         txt: str = " ".join(txt)
-        input_ids: torch.Tensor = self.tokenizer(text=txt,
+        result: dict = self.tokenizer(text=txt,
                                                  padding="max_length",
                                                  truncation="only_first",
                                                  max_length=self.max_length_txt,
-                                                 return_tensors="pt")["input_ids"].squeeze()
-        return input_ids
+                                                 return_attention_mask=True,
+                                                 return_tensors="pt")
+        input_ids = result["input_ids"].squeeze()
+        mask = result["attention_mask"].squeeze()
+        return input_ids, mask
 
     def processed_db(self, generate_csv: bool = False, fold_num: int = 4) -> pd.DataFrame:
         """ Reads in .csv file if exists.
@@ -309,6 +341,8 @@ class KEMDDataset(Dataset):
     with hydra.initialize(version_base=None, config_path="./config"):
         cfg = hydra.compose(config_name="config")
     dataset = hydra.utils.instantiate(cfg.dataset)
+    dataloader = hydra.utils.instantiate(cfg.dataloader)
+    batch = next(iter(dataloader))
     ```
     """
     def __init__(
