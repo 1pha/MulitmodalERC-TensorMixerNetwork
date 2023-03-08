@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+from transformers import AutoTokenizer
 
 from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20
 from erc.utils import check_exists, get_logger
@@ -24,6 +25,9 @@ class KEMDBase(Dataset):
         base_path: str,
         generate_csv: bool = False,
         return_bio: bool = False,
+        max_length_wav: int = 200_000,
+        max_length_txt: int = 50,
+        tokenizer_name: str = "klue/bert-base",
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN
     ):
@@ -53,6 +57,9 @@ class KEMDBase(Dataset):
         logger.info("Instantiate %s Dataset", self.NAME)
         self.base_path: Path = Path(base_path)
         self.return_bio = return_bio
+        self.max_length_wav = max_length_wav
+        self.max_length_txt = max_length_txt
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         # This assertion is subject to change: number of folds to split
         assert isinstance(validation_fold, int) and validation_fold in range(-1, 5),\
             f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
@@ -76,7 +83,7 @@ class KEMDBase(Dataset):
         if not os.path.exists(wav_path) or not os.path.exists(txt_path):
             # Pre-checking data existence
             # TODO This should be dealed! Not a good behavior
-            print('Error occurs -> ', wav_prefix)
+            logger.warn("Error occurs -> %s", wav_prefix)
             return data
 
         # Wave File
@@ -105,6 +112,22 @@ class KEMDBase(Dataset):
         # Man-Female
         data["gender"] = self.gender2num(gender) # Sess01_script01_F003
         return data
+    
+    def pad_value(
+        self,
+        arr: torch.Tensor,
+        max_length: int,
+        pad_value: int | float = 0,
+    ) -> torch.Tensor:
+        """ Assumes single data """
+        if not isinstance(arr, torch.Tensor):
+            arr = torch.tensor(arr)
+        
+        if len(arr) >= max_length:
+            arr = arr[:max_length]
+        else:
+            arr = torch.nn.functional.pad(arr, pad=(0, max_length - len(arr)), value=pad_value)
+        return arr
 
     def get_wav(self, wav_path: Path | str) -> torch.Tensor | np.ndarray:
         """ Get output feature vector from pre-trained wav2vec model
@@ -112,6 +135,7 @@ class KEMDBase(Dataset):
         """
         wav_path = check_exists(wav_path)
         sampling_rate, data = wavfile.read(wav_path)
+        data = self.pad_value(data, max_length=self.max_length_wav)
         return sampling_rate, data
 
     def get_txt(self, txt_path: Path | str, encoding: str = None) -> torch.Tensor:
@@ -126,8 +150,15 @@ class KEMDBase(Dataset):
         """
         txt_path = check_exists(txt_path)
         with open(txt_path, mode="r", encoding=encoding) as f:
-            txt = f.readlines()
-        return txt
+            txt: list = f.readlines()
+        # We assume there is a single line
+        txt: str = " ".join(txt)
+        input_ids: torch.Tensor = self.tokenizer(text=txt,
+                                                 padding="max_length",
+                                                 truncation="only_first",
+                                                 max_length=self.max_length_txt,
+                                                 return_tensors="pt")["input_ids"].squeeze()
+        return input_ids
 
     def processed_db(self, generate_csv: bool = False, fold_num: int = 4) -> pd.DataFrame:
         """ Reads in .csv file if exists.
@@ -191,6 +222,9 @@ class KEMDy19Dataset(KEMDBase):
         base_path: str = "./data/KEMDy19",
         generate_csv: bool = False,
         return_bio: bool = True,
+        max_length_wav: int = 200_000,
+        max_length_txt: int = 50,
+        tokenizer_name: str = "klue/bert-base",
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN
     ):
@@ -198,6 +232,9 @@ class KEMDy19Dataset(KEMDBase):
             base_path,
             generate_csv,
             return_bio,
+            max_length_wav,
+            max_length_txt,
+            tokenizer_name,
             validation_fold,
             mode
         )
@@ -229,6 +266,9 @@ class KEMDy20Dataset(KEMDBase):
         base_path: str = "./data/KEMDy20_v1_1",
         generate_csv: bool = False,
         return_bio: bool = False,
+        max_length_wav: int = 200_000,
+        max_length_txt: int = 50,
+        tokenizer_name: str = "klue/bert-base",
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN
     ):
@@ -236,6 +276,9 @@ class KEMDy20Dataset(KEMDBase):
             base_path,
             generate_csv,
             return_bio,
+            max_length_wav,
+            max_length_txt,
+            tokenizer_name,
             validation_fold,
             mode
         )
@@ -253,15 +296,42 @@ class KEMDy20Dataset(KEMDBase):
 
 
 class KEMDDataset(Dataset):
-    """ Integrated dataset for KEMDy19 and KEMDy20_v1_1 """
+    """ Integrated dataset for KEMDy19 and KEMDy20_v1_1
+    Example codes:
+    ```config
+    dataset:
+        _target_: erc.datasets.KEMDDataset
+        return_bio: False
+        validation_fold: 4
+        mode: train
+    ```
+    ```python
+    with hydra.initialize(version_base=None, config_path="./config"):
+        cfg = hydra.compose(config_name="config")
+    dataset = hydra.utils.instantiate(cfg.dataset)
+    ```
+    """
     def __init__(
         self,
         return_bio: bool = False,
         validation_fold: int = 4,
+        max_length_wav: int = 200_000,
+        max_length_txt: int = 50,
+        tokenizer_name: str = "klue/bert-base",
         mode: RunMode | str = RunMode.TRAIN
     ):
-        self.kemdy19 = KEMDy19Dataset(return_bio=return_bio, validation_fold=validation_fold, mode=mode)
-        self.kemdy20 = KEMDy20Dataset(return_bio=return_bio, validation_fold=validation_fold, mode=mode)
+        self.kemdy19 = KEMDy19Dataset(return_bio=return_bio,
+                                      max_length_wav=max_length_wav,
+                                      max_length_txt=max_length_txt,
+                                      tokenizer_name=tokenizer_name,
+                                      validation_fold=validation_fold,
+                                      mode=mode)
+        self.kemdy20 = KEMDy20Dataset(return_bio=return_bio,
+                                      max_length_wav=max_length_wav,
+                                      max_length_txt=max_length_txt,
+                                      tokenizer_name=tokenizer_name,
+                                      validation_fold=validation_fold,
+                                      mode=mode)
 
     def __len__(self):
         return len(self.kemdy19) + len(self.kemdy20)
