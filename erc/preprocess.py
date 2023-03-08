@@ -73,6 +73,8 @@ def merge_csv_kemdy19(
         f_df = pd.read_csv(f_ann).dropna()[list(columns_kemdy19.keys())]
 
         # Sess01_impro03, Sess01_impro04의 TEMP와 E4-EDA값이 결측
+        # 다른 Session에서도 결측값은 있으나, 해당 두 세션에는 결측값이 너무 많아 유효한 데이터가 아니라고 판단하여
+        # 모두 사용하지 않기로함
         m_df = m_df[
             ~(m_df["Segment ID"].str.contains("Sess01_impro03"))
             & ~(m_df["Segment ID"].str.contains("Sess01_impro04"))

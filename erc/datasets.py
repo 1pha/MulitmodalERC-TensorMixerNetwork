@@ -45,7 +45,8 @@ class KEMDBase(Dataset):
                     - Fold 1: Session 5 - 8
                     - Fold 2: Session 9 - 12
                     - Fold 3: Session 13 - 16
-                    - Fold 4: Session 17 - 20
+                    - Fold 4: Session 17 - 
+                If -1 given, load the whole fold
             mode:
                 Train / valid / test mode.
         """
@@ -53,7 +54,7 @@ class KEMDBase(Dataset):
         self.base_path: Path = Path(base_path)
         self.return_bio = return_bio
         # This assertion is subject to change: number of folds to split
-        assert isinstance(validation_fold, int) and validation_fold in range(0, 5),\
+        assert isinstance(validation_fold, int) and validation_fold in range(-1, 5),\
             f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
         self.validation_fold = validation_fold
         self.mode = RunMode[mode.upper()] if isinstance(mode, str) else mode
@@ -151,12 +152,15 @@ class KEMDBase(Dataset):
         fold_num: int,
         mode: RunMode | str = RunMode.TRAIN,
     ) -> pd.DataFrame:
-        sessions: pd.Series = total_df["segment_id"].apply(lambda s: s.split("_")[0][-2:])
-        sessions = sessions.apply(int)
-        fold_dict: dict = get_folds(num_session=self.NUM_SESSIONS, num_folds=self.NUM_FOLDS)
-        fold_range: range = fold_dict[fold_num]
-        loc = ~sessions.isin(fold_range) if mode == RunMode.TRAIN else sessions.isin(fold_range)
-        return total_df.loc[loc]
+        if fold_num == -1:
+            return total_df
+        else:
+            sessions: pd.Series = total_df["segment_id"].apply(lambda s: s.split("_")[0][-2:])
+            sessions = sessions.apply(int)
+            fold_dict: dict = get_folds(num_session=self.NUM_SESSIONS, num_folds=self.NUM_FOLDS)
+            fold_range: range = fold_dict[fold_num]
+            loc = ~sessions.isin(fold_range) if mode == RunMode.TRAIN else sessions.isin(fold_range)
+            return total_df.loc[loc]
     
     def str2num(self, key: str) -> torch.Tensor:
         emotion = emotion2idx.get(key, 0)
