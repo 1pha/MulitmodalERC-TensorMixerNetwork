@@ -21,6 +21,7 @@ def _test_fold_split(num_session, num_folds, gt_sess: list):
     sess = set(chain.from_iterable([list(r) for r in fold_dict.values()]))
     assert len(sess) == num_session, f""
 
+
 def test_fold_split():
     # KEMDy19
     num_session, num_folds, gt_sess = 20, 5, [4, 4, 4, 4, 4]

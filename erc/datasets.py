@@ -237,6 +237,15 @@ class KEMDBase(Dataset):
         """ Parse `segment_id` into useful information 
         This varies across dataset. Needs to be implemented for `__getitem__` method """
         raise NotImplementedError
+
+    def merge_csv(
+        self,
+        base_path: str | Path = "./data/KEMDy20_v1_1",
+        save_path: str | Path = "./data/kemdy20.csv",
+    ):
+        """ Loads all annotation .csv and merge into a single csv.
+        This function is called when target .csv is not found. """
+        raise NotImplementedError
     
 
 class KEMDy19Dataset(KEMDBase):
@@ -248,7 +257,6 @@ class KEMDy19Dataset(KEMDBase):
     TOTAL_DF_PATH = "./data/kemdy19.csv"
     TEXT_ENCODING: str = None
 
-    merge_csv: callable = merge_csv_kemdy19
     def __init__(
         self,
         base_path: str = "./data/KEMDy19",
@@ -271,6 +279,13 @@ class KEMDy19Dataset(KEMDBase):
             mode
         )
 
+    def merge_csv(
+        self,
+        base_path: str | Path = "./data/KEMDy19",
+        save_path: str | Path = "./data/kemdy19.csv",
+    ):
+        return merge_csv_kemdy19(base_path=base_path, save_path=save_path)
+
     def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:
         """ KEMDy19
             segment_id: Sess01_script01_M001
@@ -292,7 +307,6 @@ class KEMDy20Dataset(KEMDBase):
     TOTAL_DF_PATH = "./data/kemdy20.csv"
     TEXT_ENCODING: str = "cp949"
 
-    merge_csv: callable = merge_csv_kemdy20
     def __init__(
         self,
         base_path: str = "./data/KEMDy20_v1_1",
@@ -314,6 +328,13 @@ class KEMDy20Dataset(KEMDBase):
             validation_fold,
             mode
         )
+
+    def merge_csv(
+        self,
+        base_path: str | Path = "./data/KEMDy20_v1_1",
+        save_path: str | Path = "./data/kemdy20.csv",
+    ):
+        return merge_csv_kemdy20(base_path=base_path, save_path=save_path)
 
     def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:
         """
