@@ -166,7 +166,7 @@ class KEMDBase(Dataset):
         wav_path = check_exists(wav_path)
         # sampling_rate, data = wavfile.read(wav_path)
         data, sampling_rate = torchaudio.load(wav_path)
-        data, mask = self.pad_value(data, max_length=self.max_length_wav)
+        data, mask = self.pad_value(data.squeeze(), max_length=self.max_length_wav)
         return sampling_rate, data, mask
 
     def get_txt(self, txt_path: Path | str, encoding: str = None) -> Tuple[torch.Tensor, torch.Tensor]:
