@@ -228,11 +228,11 @@ class KEMDBase(Dataset):
             return total_df.loc[loc]
     
     def str2num(self, key: str) -> torch.Tensor:
-        emotion = emotion2idx.get(key, 0)
+        emotion = emotion2idx.get(key, -1)
         return torch.tensor(emotion, dtype=torch.long)
     
     def gender2num(self, key: str) -> torch.Tensor:
-        gender = gender2idx.get(key, 0)
+        gender = gender2idx.get(key, -1)
         return torch.tensor(gender, dtype=torch.long)
     
     def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:

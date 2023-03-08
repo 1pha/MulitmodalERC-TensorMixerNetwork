@@ -91,9 +91,11 @@ def merge_csv_kemdy19(
         # 다시 합쳐서 정렬
         tmp_df = pd.concat([m_df, f_df], axis=0).sort_values("Numb")
         total_df = pd.concat([total_df, tmp_df], axis=0)
+
     
     logger.info(f"New dataframe saved as {save_path}")
     total_df.columns = list(columns_kemdy19.values())
+    total_df = total_df[~total_df['emotion'].str.contains(';')]
     total_df.to_csv(save_path, index=False)
     return total_df
 
@@ -128,5 +130,6 @@ def merge_csv_kemdy20(
     
     logger.info(f"New dataframe saved as {save_path}")
     total_df.columns = list(columns_kemdy20.values())
+    total_df = total_df[~total_df['emotion'].str.contains(';')]
     total_df.to_csv(save_path, index=False)
     return total_df
