@@ -43,7 +43,6 @@ def eda_preprocess(file_path: str) -> pd.DataFrame:
 
 
 def merge_csv_kemdy19(
-    self = None,
     base_path: str | Path = "./data/KEMDy19",
     save_path: str | Path = "./data/kemdy19.csv",
 ) -> pd.DataFrame:
@@ -99,7 +98,6 @@ def merge_csv_kemdy19(
 
 
 def merge_csv_kemdy20(
-    self = None,
     base_path: str | Path = "./data/KEMDy20_v1_1",
     save_path: str | Path = "./data/kemdy20.csv",
 ) -> pd.DataFrame:
