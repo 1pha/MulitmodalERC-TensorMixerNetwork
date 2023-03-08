@@ -74,14 +74,9 @@ def merge_csv_kemdy19(
         # Sess01_impro03, Sess01_impro04의 TEMP와 E4-EDA값이 결측
         # 다른 Session에서도 결측값은 있으나, 해당 두 세션에는 결측값이 너무 많아 유효한 데이터가 아니라고 판단하여
         # 모두 사용하지 않기로함
-        m_df = m_df[
-            ~(m_df["Segment ID"].str.contains("Sess01_impro03"))
-            & ~(m_df["Segment ID"].str.contains("Sess01_impro04"))
-        ]
-        f_df = f_df[
-            ~(f_df["Segment ID"].str.contains("Sess01_impro03"))
-            & ~(f_df["Segment ID"].str.contains("Sess01_impro04"))
-        ]
+        _drop_scripts = ['Sess01_impro03', 'Sess01_impro04', 'Sess03_script04', 'Sess06_script02', 'Sess07_script02']
+        m_df = m_df[~(m_df["Segment ID"].str.contains('|'.join(_drop_scripts)))]
+        f_df = f_df[~(f_df["Segment ID"].str.contains('|'.join(_drop_scripts)))]
 
         # 각 발화의 성별에 대한 감정만 추출
         m_df = m_df[m_df["Segment ID"].str.contains("M")]
