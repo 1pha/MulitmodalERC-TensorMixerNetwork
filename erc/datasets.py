@@ -45,7 +45,7 @@ class KEMDBase(Dataset):
                     - Fold 1: Session 5 - 8
                     - Fold 2: Session 9 - 12
                     - Fold 3: Session 13 - 16
-                    - Fold 4: Session 17 - 
+                    - Fold 4: Session 17 - 20
                 If -1 given, load the whole fold
             mode:
                 Train / valid / test mode.
