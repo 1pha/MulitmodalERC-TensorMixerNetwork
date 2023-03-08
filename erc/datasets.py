@@ -341,6 +341,8 @@ class KEMDDataset(Dataset):
     with hydra.initialize(version_base=None, config_path="./config"):
         cfg = hydra.compose(config_name="config")
     dataset = hydra.utils.instantiate(cfg.dataset)
+    dataloader = hydra.utils.instantiate(cfg.dataloader)
+    batch = next(iter(dataloader))
     ```
     """
     def __init__(
