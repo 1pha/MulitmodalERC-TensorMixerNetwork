@@ -18,7 +18,7 @@ def main(cfg: omegaconf.DictConfig):
     valid_dataset = hydra.utils.instantiate(cfg.dataset, mode="valid")
 
     pretrain_str = "kresnik/wav2vec2-large-xlsr-korean"
-    processor = Wav2Vec2Processor.from_pretrained(pretrain_str)
+    # processor = Wav2Vec2Processor.from_pretrained(pretrain_str)
     model = Wav2Vec2ForSequenceClassification.from_pretrained(pretrain_str,
                                                               num_labels=7)
 
@@ -28,28 +28,28 @@ def main(cfg: omegaconf.DictConfig):
     train_loader = hydra.utils.instantiate(cfg.dataloader, dataset=train_dataset)
     accelerator = Accelerator()
 
-    model, optimizer, train_loader, criterion, processor = accelerator.prepare(
-        model, optimizer, train_loader, criterion,processor)
+    model, optimizer, train_loader = accelerator.prepare(
+        model, optimizer, train_loader)
 
     total_loss = 0
-    train_loss = []
+    # train_loss = []
     for batch_idx, batch in enumerate(train_loader): 
-        labels = batch['emotion']
+        labels = batch['emotion'].long()
         inputs = {"input_values": batch['wav'],
                 "attention_mask": batch['wav_mask']}
         logits = model(**inputs).logits
 
-        loss = criterion(logits, labels.long())
-        total_loss += loss.item()
-        train_loss.append(total_loss / (batch_idx + 1))
+        loss = criterion(logits, labels)
+        # total_loss += loss.item()
+        # train_loss.append(total_loss / (batch_idx + 1))
 
         optimizer.zero_grad()
         accelerator.backward(loss)
         optimizer.step()
 
-    avg_train_loss = total_loss / len(train_loader)
-    print(f'  Average training loss: {avg_train_loss:.2f}')
-    return avg_train_loss
+    # avg_train_loss = total_loss / len(train_loader)
+    # print(f'  Average training loss: {avg_train_loss:.2f}')
+    # return avg_train_loss
 
 if __name__=="__main__":
     main()

@@ -1,0 +1,1 @@
+accelerate launch --multi_gpu --num_processes=3 sample.py dataloader.batch_size=4
