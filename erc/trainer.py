@@ -63,10 +63,13 @@ class ERCModule(pl.LightningModule):
 
     def training_step(self, batch):
         result = self.forward(batch)
+
+        self.acc(result['logits'], result['labels'])
+        self.log('train_acc_step', self.acc)
+
         return result
 
     def training_epoch_end(self, outputs):
-        breakpoint()
         total_loss = sum([output['loss'] for output in outputs]) / len(outputs)
         total_logits = self.acc()
 
