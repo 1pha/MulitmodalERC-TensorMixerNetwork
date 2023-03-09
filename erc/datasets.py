@@ -115,9 +115,9 @@ class KEMDBase(Dataset):
         data["wav_mask"] = wav_mask
         
         # Txt File
-        # txt, txt_mask = self.get_txt(txt_path=txt_path, encoding=self.TEXT_ENCODING)
-        # data["txt"] = txt
-        # data["txt_mask"] = txt_mask
+        txt, txt_mask = self.get_txt(txt_path=txt_path, encoding=self.TEXT_ENCODING)
+        data["txt"] = txt
+        data["txt_mask"] = txt_mask
         
         # Bio Signals
         # Currently returns average signals across time elapse
@@ -166,30 +166,30 @@ class KEMDBase(Dataset):
         data, mask = self.pad_value(data.squeeze(), max_length=self.max_length_wav)
         return sampling_rate, data, mask
 
-    # def get_txt(self, txt_path: Path | str, encoding: str = None) -> Tuple[torch.Tensor, torch.Tensor]:
-    #     """ Get output feature vector from pre-trained txt model
-    #     :parameters:
-    #         txt_path: Path to text in Sessions
-    #         encoding: For KEMDy19, None. For KEMDy20_v1_1, cp949
-    #     TODO:
-    #         1. How to process special cases: /o /l 
-    #             -> They _maybe_ processed by pre-trained toeknizers
-    #         2. Which model to use
-    #     """
-    #     txt_path = check_exists(txt_path)
-    #     with open(txt_path, mode="r", encoding=encoding) as f:
-    #         txt: list = f.readlines()
-    #     # We assume there is a single line
-    #     txt: str = " ".join(txt)
-    #     result: dict = self.tokenizer(text=txt,
-    #                                   padding="max_length",
-    #                                   truncation="only_first",
-    #                                   max_length=self.max_length_txt,
-    #                                   return_attention_mask=True,
-    #                                   return_tensors="pt")
-    #     input_ids = result["input_ids"].squeeze()
-    #     mask = result["attention_mask"].squeeze()
-    #     return input_ids, mask
+    def get_txt(self, txt_path: Path | str, encoding: str = None) -> Tuple[torch.Tensor, torch.Tensor]:
+        """ Get output feature vector from pre-trained txt model
+        :parameters:
+            txt_path: Path to text in Sessions
+            encoding: For KEMDy19, None. For KEMDy20_v1_1, cp949
+        TODO:
+            1. How to process special cases: /o /l 
+                -> They _maybe_ processed by pre-trained toeknizers
+            2. Which model to use
+        """
+        txt_path = check_exists(txt_path)
+        with open(txt_path, mode="r", encoding=encoding) as f:
+            txt: list = f.readlines()
+        # We assume there is a single line
+        txt: str = " ".join(txt)
+        result: dict = self.tokenizer(text=txt,
+                                      padding="max_length",
+                                      truncation="only_first",
+                                      max_length=self.max_length_txt,
+                                      return_attention_mask=True,
+                                      return_tensors="pt")
+        input_ids = result["input_ids"].squeeze()
+        mask = result["attention_mask"].squeeze()
+        return input_ids, mask
 
     def processed_db(self, generate_csv: bool = False, fold_num: int = 4) -> pd.DataFrame:
         """ Reads in .csv file if exists.

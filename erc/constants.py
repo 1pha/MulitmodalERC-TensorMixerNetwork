@@ -2,6 +2,11 @@ from collections import OrderedDict
 from enum import Enum
 
 
+class Task(Enum):
+    CLS = "classification"
+    REG = "regression"
+
+
 class RunMode(Enum):
     TRAIN = "train"
     VALID = "valid"
