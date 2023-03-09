@@ -17,14 +17,13 @@ class WavCls(ModelBase):
         self.model = Wav2Vec2ForSequenceClassification.from_pretrained(config, **config_kwargs)
         self.criterion = criterion
 
-    def forward(self, wav: torch.Tensor, wav_mask: torch.Tensor, label: torch.Tensor = None):
-        result = {}
+    def forward(self, wav: torch.Tensor, wav_mask: torch.Tensor, labels: torch.Tensor = None):
         # We retrieve logits directly in order to avoid last_hidden_state memory allocation issue
-        logits = self.model(input_values=wav, attention_mask=wav_mask).logits
-        if label is not None:
-            loss = self.criterion(logits, label.long())
-            result["loss"] = loss
-        return result
+        output = self.model(input_values=wav, attention_mask=wav_mask, labels=labels)
+        return {
+            'loss': output['loss'],
+            'logits': output['logits'],
+        }
 
 
 class WavReg(ModelBase):
