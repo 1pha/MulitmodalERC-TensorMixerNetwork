@@ -2,13 +2,12 @@ import os
 from pathlib import Path
 from typing import Tuple
 
-from scipy.io import wavfile
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 import torchaudio
-from transformers import AutoTokenizer, Wav2Vec2Processor
+from transformers import AutoTokenizer
 
 from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20
 from erc.utils import check_exists, get_logger
@@ -183,11 +182,11 @@ class KEMDBase(Dataset):
         # We assume there is a single line
         txt: str = " ".join(txt)
         result: dict = self.tokenizer(text=txt,
-                                                 padding="max_length",
-                                                 truncation="only_first",
-                                                 max_length=self.max_length_txt,
-                                                 return_attention_mask=True,
-                                                 return_tensors="pt")
+                                      padding="max_length",
+                                      truncation="only_first",
+                                      max_length=self.max_length_txt,
+                                      return_attention_mask=True,
+                                      return_tensors="pt")
         input_ids = result["input_ids"].squeeze()
         mask = result["attention_mask"].squeeze()
         return input_ids, mask

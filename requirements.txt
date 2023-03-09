@@ -12,3 +12,5 @@ transformers==4.26.1
 scipy
 pytest
 fire
+jiwer
+accelerate
