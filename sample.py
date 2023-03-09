@@ -25,7 +25,7 @@ from transformers import Wav2Vec2Processor
 import torch 
 from torch.utils.data import DataLoader
 
-from accelerate import Accelerator
+# from accelerate import Accelerator
 
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor, Wav2Vec2ForSequenceClassification
 
@@ -51,7 +51,7 @@ valid_dataset = hydra.utils.instantiate(cfg.dataset)
 pretrain_str = "kresnik/wav2vec2-large-xlsr-korean"
 # pretrain_str = "w11wo/wav2vec2-xls-r-300m-korean"
 
-processor= Wav2Vec2Processor.from_pretrained(pretrain_str)
+# processor= Wav2Vec2Processor.from_pretrained(pretrain_str)
 pretrained_model = Wav2Vec2ForSequenceClassification.from_pretrained(
     # "wav2vec2-xls-r-300m-korean",
     pretrain_str,
@@ -63,10 +63,10 @@ criterion = nn.CrossEntropyLoss()
 optimizer = AdamW(model.parameters(), lr = 1e-5,  eps = 1e-8)
 
 train_loader = DataLoader(train_dataset, batch_size= 2)
-accelerator = Accelerator()
+# accelerator = Accelerator()
 
-model, optimizer, train_loader, criterion, processor = accelerator.prepare(
-     model, optimizer, train_loader, criterion,processor )
+# model, optimizer, train_loader, criterion, processor = accelerator.prepare(
+#      model, optimizer, train_loader, criterion,processor )
 
 
 
@@ -92,8 +92,8 @@ for step, batch in enumerate(train_loader):
     total_loss += loss.item()
     train_loss.append(total_loss/(step+1))
     # print(loss.item())
-    # loss.backward()
-    accelerator.backward(loss)
+    loss.backward()
+    # accelerator.backward(loss)
     optimizer.step()
 
 avg_train_loss = total_loss / len(train_loader)

@@ -54,8 +54,8 @@ def split_df_by_gender(df: pd.DataFrame, total:bool = True):
     if total:
         return generate_eva_dict(df)
     else:
-        male_dict = generate_eva_dict(df[df['gender'] == 1])
-        female_dict = generate_eva_dict(df[df['gender'] == 2])
+        male_dict = generate_eva_dict(df[df['gender'] == 0])
+        female_dict = generate_eva_dict(df[df['gender'] == 1])
         return male_dict, female_dict
 
 
@@ -64,6 +64,7 @@ def generate_eva_dict(df_: pd.DataFrame) -> dict:
     Summary: 
         감정 별 Valence Arousal mean, std 
     """
+    idx2emotion = {v:k for k,v in emotion2idx.items()}
     choice_col = ['valence','arousal']
     mean_std_dict = defaultdict(dict)
     for emotion_idx in df_['emotion'].unique():
@@ -76,5 +77,6 @@ def generate_eva_dict(df_: pd.DataFrame) -> dict:
             'valence_std' : stds[0],
             'arousal_std': stds[1]
         }
-        mean_std_dict[emotion2idx.get(emotion_idx)] = tmp_dict
+
+        mean_std_dict[idx2emotion.get(emotion_idx)] = tmp_dict
     return mean_std_dict

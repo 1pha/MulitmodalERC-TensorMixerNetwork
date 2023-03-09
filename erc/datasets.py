@@ -29,8 +29,8 @@ class KEMDBase(Dataset):
         max_length_wav: int = 200_000,
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
+        # processor_name: str = "kresnik/wav2vec2-large-xlsr-korean",
         validation_fold: int = 4,
-        processor_name: str = 'kresnik/wav2vec2-large-xlsr-korean',
         mode: RunMode | str = RunMode.TRAIN
     ):
         """
@@ -62,15 +62,14 @@ class KEMDBase(Dataset):
         self.max_length_wav = max_length_wav
         self.max_length_txt = max_length_txt
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        # self.processor = Wav2Vec2Processor.from_pretrained(pretrained_model_name_or_path=processor_name)
         # This assertion is subject to change: number of folds to split
         assert isinstance(validation_fold, int) and validation_fold in range(-1, 5),\
             f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
         self.validation_fold = validation_fold
         self.mode = RunMode[mode.upper()] if isinstance(mode, str) else mode
-
         self.df: pd.DataFrame = self.processed_db(generate_csv=generate_csv,
                                                   fold_num=validation_fold)
-        self.processor = Wav2Vec2Processor.from_pretrained(processor_name)
 
     def __len__(self):
         return len(self.df)
@@ -168,10 +167,10 @@ class KEMDBase(Dataset):
         wav_path = check_exists(wav_path)
         # sampling_rate, data = wavfile.read(wav_path)
         data, sampling_rate = torchaudio.load(wav_path)
-        data = self.processor(data, 
-                             sampling_rate=sampling_rate,
-                             return_tensors="pt",
-                             return_attention_mask = False)['input_values']
+        # data = self.processor(data, 
+        #                      sampling_rate=sampling_rate,
+        #                      return_tensors="pt",
+        #                      return_attention_mask = False)['input_values']
         data, mask = self.pad_value(data.squeeze(), max_length=self.max_length_wav)
         return sampling_rate, data, mask
 
