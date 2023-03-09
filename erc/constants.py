@@ -20,6 +20,17 @@ emotion2idx = {
     "disgust": 6,
 }
 
+# idx mapper to emotion
+idx2emotion = {
+    0: 'surprise',
+    1: 'fear',
+    2: 'angry',
+    3: 'neutral',
+    4: 'happy',
+    5: 'sad',
+    6: 'disgust'
+}
+
 # Gender Mapper
 gender2idx = {
     "M": 0,
