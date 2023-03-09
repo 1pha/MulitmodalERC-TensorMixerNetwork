@@ -15,4 +15,5 @@ scipy
 pytest
 fire
 jiwer
+datasets
 accelerate
