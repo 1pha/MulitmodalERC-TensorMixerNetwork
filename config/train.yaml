@@ -36,6 +36,10 @@ module:
   _target_: erc.trainer.ERCModule
   debug: bool
 
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  project: etri-erc
+
 trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 200

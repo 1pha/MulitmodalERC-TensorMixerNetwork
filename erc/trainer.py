@@ -26,6 +26,9 @@ class ERCModule(pl.LightningModule):
         self.train_loader = train_loader
         self.valid_loader = valid_loader
 
+        self.acc = Accuracy(task="multiclass", num_classes=7)
+        self.auroc = AUROC(task="multiclass", num_classes=7)
+
     def train_dataloader(self):
         return self.train_loader
 
@@ -64,6 +67,8 @@ class ERCModule(pl.LightningModule):
 
     def training_epoch_end(self, outputs):
         breakpoint()
+        total_loss = sum([output['loss'] for output in outputs]) / len(outputs)
+        total_logits = self.acc()
 
     def validation_step(self, batch):
         result = self.forward(batch)
@@ -98,5 +103,6 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
 
 def train(config: omegaconf.DictConfig) -> None:
     module: pl.LightningModule = setup_trainer(config)
-    trainer = hydra.utils.instantiate(config.trainer)
+    logger = hydra.utils.instantiate(config.logger)
+    trainer = hydra.utils.instantiate(config.trainer, logger=logger)
     trainer.fit(model=module)

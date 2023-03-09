@@ -22,7 +22,8 @@ class WavCls(ModelBase):
         output = self.model(input_values=wav, attention_mask=wav_mask, labels=labels)
         return {
             'loss': output['loss'],
-            'logits': output['logits'],
+            'labels': output['labels'],
+            'logits': output['logits'].detach().cpu(),
         }
 
 

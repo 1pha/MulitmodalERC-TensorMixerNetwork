@@ -16,3 +16,4 @@ pytest
 fire
 jiwer
 accelerate
+wandb
