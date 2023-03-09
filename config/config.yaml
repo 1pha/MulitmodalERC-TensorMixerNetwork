@@ -9,6 +9,7 @@ dataset:
 dataloader:
   _target_: torch.utils.data.DataLoader
   batch_size: 16
+  num_workers: 1
   dataset: ${dataset}
 
 misc:
@@ -19,7 +20,7 @@ criterion:
   _target_: torch.nn.CrossEntropyLoss
 
 optimizer:
-  _target_: torch.nn.AdamW
+  _target_: torch.optim.AdamW
   eps: 1e-8
   lr: 1e-5
   weight_decay: 1e-6
