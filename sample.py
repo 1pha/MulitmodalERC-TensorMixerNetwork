@@ -26,30 +26,22 @@ def main(cfg: omegaconf.DictConfig):
     optimizer = AdamW(model.parameters(), lr=1e-5, eps=1e-8)
 
     train_loader = hydra.utils.instantiate(cfg.dataloader, dataset=train_dataset)
+    
     accelerator = Accelerator()
+    model, optimizer, train_loader = accelerator.prepare(model, optimizer, train_loader)
 
-    model, optimizer, train_loader, criterion, processor = accelerator.prepare(
-        model, optimizer, train_loader, criterion,processor)
-
-    total_loss = 0
-    train_loss = []
-    for batch_idx, batch in enumerate(train_loader): 
+    for _, batch in enumerate(train_loader): 
         labels = batch['emotion']
         inputs = {"input_values": batch['wav'],
                 "attention_mask": batch['wav_mask']}
         logits = model(**inputs).logits
-
         loss = criterion(logits, labels.long())
-        total_loss += loss.item()
-        train_loss.append(total_loss / (batch_idx + 1))
 
         optimizer.zero_grad()
         accelerator.backward(loss)
         optimizer.step()
 
-    avg_train_loss = total_loss / len(train_loader)
-    print(f'  Average training loss: {avg_train_loss:.2f}')
-    return avg_train_loss
+    return 0
 
 if __name__=="__main__":
     main()
