@@ -15,12 +15,13 @@ class ERCModule(pl.LightningModule):
                  optimizer: torch.optim.Optimizer,
                  scheduler: torch.optim.lr_scheduler._LRScheduler,
                  train_loader: torch.utils.data.DataLoader,
-                 valid_loader: torch.utils.data.DataLoader,):
+                 valid_loader: torch.utils.data.DataLoader,
+                 debug: bool = False):
         super().__init__()
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
-        
+
         self.train_loader = train_loader
         self.valid_loader = valid_loader
 
@@ -44,10 +45,15 @@ class ERCModule(pl.LightningModule):
         return label
 
     def forward(self, batch):
-        label = self.get_label(batch)
-        loss = self.model(wav=batch["wav"],
-                          wav_mask=batch["wav_mask"],
-                          label=label)
+        try:
+            label = self.get_label(batch)
+            loss = self.model(wav=batch["wav"],
+                            wav_mask=batch["wav_mask"],
+                            label=label)
+        except RuntimeError:
+            # For CUDA Device-side asserted error
+            print(f"Label given {label}")
+            logger.warn("Label given %s", label)
         return loss
 
     def training_step(self, batch):
@@ -60,29 +66,31 @@ class ERCModule(pl.LightningModule):
     def validation_step(self, batch):
         loss = self.forward(batch)
         return loss
-    
+
 
 def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     logger.info("Start Setting up")
     erc.utils._seed_everything(config.misc.seed)
 
+    logger.info("Start intantiating Models & Optimizers")
     model = hydra.utils.instantiate(config.model)
     optim = hydra.utils.instantiate(config.optim, params=model.parameters())
     sch = hydra.utils.instantiate(config.sch, optimizer=optim) \
         if config.get("sch", None) else None
 
+    logger.info("Start instantiating dataloaders")
     train_dataset = hydra.utils.instantiate(config.dataset, mode="train")
     train_loader = hydra.utils.instantiate(config.dataloader, dataset=train_dataset)
     valid_dataset = hydra.utils.instantiate(config.dataset, mode="valid")
     valid_loader = hydra.utils.instantiate(config.dataloader, dataset=valid_dataset)
     
+    logger.info("Start instantiating Pytorch-Lightning Trainer")
     module = hydra.utils.instantiate(config.module,
                                       model=model,
                                       optimizer=optim,
                                       scheduler=sch,
                                       train_loader=train_loader,
                                       valid_loader=valid_loader)
-
     return module
 
 

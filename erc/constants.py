@@ -23,6 +23,7 @@ emotion2idx = {
     "happy": 4,
     "sad": 5,
     "disgust": 6,
+    "disqust": 6,
 }
 
 # Gender Mapper

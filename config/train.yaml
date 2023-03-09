@@ -28,11 +28,13 @@ optim:
 
 misc:
   seed: 42
-  pretrain_str: kresnik/wav2vec2-large-xlsr-korean
+  debug: False
   # "w11wo/wav2vec2-xls-r-300m-korean" for other pre-trained
+
 
 module:
   _target_: erc.trainer.ERCModule
+  debug: bool
 
 trainer:
   _target_: pytorch_lightning.Trainer

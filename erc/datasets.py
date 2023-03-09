@@ -54,7 +54,7 @@ class KEMDBase(Dataset):
             mode:
                 Train / valid / test mode.
         """
-        logger.info("Instantiate %s Dataset", self.NAME)
+        logger.debug("Instantiate %s Dataset", self.NAME)
         self.base_path: Path = Path(base_path)
         self.return_bio = return_bio
         self.max_length_wav = max_length_wav
@@ -374,6 +374,7 @@ class KEMDDataset(Dataset):
         tokenizer_name: str = "klue/bert-base",
         mode: RunMode | str = RunMode.TRAIN
     ):
+        logger.info("Instantiate %s Dataset", mode)
         self.kemdy19 = KEMDy19Dataset(return_bio=return_bio,
                                       max_length_wav=max_length_wav,
                                       max_length_txt=max_length_txt,
