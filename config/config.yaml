@@ -5,9 +5,21 @@ dataset:
   max_length_txt: 50
   tokenizer_name: klue/bert-base
   validation_fold: 4
-  mode: train
 
 dataloader:
   _target_: torch.utils.data.DataLoader
   batch_size: 16
   dataset: ${dataset}
+
+misc:
+  pretrain_str: kresnik/wav2vec2-large-xlsr-korean
+  # "w11wo/wav2vec2-xls-r-300m-korean" for other pre-trained
+
+criterion:
+  _target_: torch.nn.CrossEntropyLoss
+
+optimizer:
+  _target_: torch.nn.AdamW
+  eps: 1e-8
+  lr: 1e-5
+  weight_decay: 1e-6
