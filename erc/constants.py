@@ -11,19 +11,19 @@ class RunMode(Enum):
 
 # Emotion mapper to index
 emotion2idx = {
-    "surprise": 1,
-    "fear": 2,
-    "angry": 3,
-    "neutral": 4,
-    "happy": 5,
-    "sad": 6,
-    "disgust": 7,
+    "surprise": 0,
+    "fear": 1,
+    "angry": 2,
+    "neutral": 3,
+    "happy": 4,
+    "sad": 5,
+    "disgust": 6,
 }
 
 # Gender Mapper
 gender2idx = {
-    "M": 1,
-    "F": 2,
+    "M": 0,
+    "F": 1,
 }
 
 # Column names to be chosen from annotations .csv

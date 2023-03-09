@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 import torchaudio
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, Wav2Vec2Processor
 
 from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20
 from erc.utils import check_exists, get_logger
@@ -66,7 +66,6 @@ class KEMDBase(Dataset):
             f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
         self.validation_fold = validation_fold
         self.mode = RunMode[mode.upper()] if isinstance(mode, str) else mode
-
         self.df: pd.DataFrame = self.processed_db(generate_csv=generate_csv,
                                                   fold_num=validation_fold)
 
@@ -164,7 +163,6 @@ class KEMDBase(Dataset):
         XXX: Embedding outside dataset, to fine-tune pre-trained model? See Issue
         """
         wav_path = check_exists(wav_path)
-        # sampling_rate, data = wavfile.read(wav_path)
         data, sampling_rate = torchaudio.load(wav_path)
         data, mask = self.pad_value(data.squeeze(), max_length=self.max_length_wav)
         return sampling_rate, data, mask
@@ -228,11 +226,11 @@ class KEMDBase(Dataset):
             return total_df.loc[loc]
     
     def str2num(self, key: str) -> torch.Tensor:
-        emotion = emotion2idx.get(key, 0)
+        emotion = emotion2idx.get(key, -1)
         return torch.tensor(emotion, dtype=torch.long)
     
     def gender2num(self, key: str) -> torch.Tensor:
-        gender = gender2idx.get(key, 0)
+        gender = gender2idx.get(key, -1)
         return torch.tensor(gender, dtype=torch.long)
     
     def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:
