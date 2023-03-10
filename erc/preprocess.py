@@ -142,7 +142,7 @@ def generate_datasets(
     ) -> Dataset:
     # select columns 
     origin_name = ['wav', 'wav_mask', 'emotion', 'valence', 'arousal', 'gender'][:3]
-    convert_name = ['input_values', 'attention_mask', 'label','valence','arousal', 'gender'][:3]
+    convert_name = ['input_values', 'attention_mask', 'labels','valence','arousal', 'gender'][:3]
     save_name = os.path.join(save_name, f'{mode}_{validation_fold:02d}')
     
     total_train_dataset_dict = defaultdict(list)
