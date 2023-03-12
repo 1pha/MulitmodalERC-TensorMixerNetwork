@@ -21,6 +21,18 @@ Data contains 3 modalities
 
 Put data and source codes on the same hierarchy. Prevent hard copy and use soft-link: `ln -s ACTUAL_DATA_PATH data`
 
+### Training
+With default configuration of []
+```zsh
+python train.py
+```
+
+**Fast Dev**:
+Cases where cpu is not available, debugging required. Below command reduces number of dataset being forwarded.
+```zsh
+python train.py dataset.num_data=4 dataloader.batch_size=4 trainer.accelerator=cpu
+```
+
 ### Testing Functions
 
 One may need to test a specific function on CLI. Writing an extra script for such temporal task is very nagging. Use `fire` library to boost-up productivity.
