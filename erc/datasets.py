@@ -383,7 +383,7 @@ class KEMDDataset(Dataset):
         self,
         return_bio: bool = False,
         validation_fold: int = 4,
-        max_length_wav: int = 200_000,
+        max_length_wav: int = 80_000,
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
         mode: RunMode | str = RunMode.TRAIN,

@@ -35,11 +35,12 @@ misc:
 
 module:
   _target_: erc.trainer.ERCModule
-  debug: bool
 
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
   project: etri-erc
+  entity: etri-erc
+  name: ERC-wav
 
 trainer:
   _target_: pytorch_lightning.Trainer

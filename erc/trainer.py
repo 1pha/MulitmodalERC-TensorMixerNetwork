@@ -1,3 +1,5 @@
+from typing import List, Dict
+
 import torch
 import hydra
 import omegaconf
@@ -16,8 +18,7 @@ class ERCModule(pl.LightningModule):
                  optimizer: torch.optim.Optimizer,
                  scheduler: torch.optim.lr_scheduler._LRScheduler,
                  train_loader: torch.utils.data.DataLoader,
-                 valid_loader: torch.utils.data.DataLoader,
-                 debug: bool = False):
+                 valid_loader: torch.utils.data.DataLoader):
         super().__init__()
         self.model = model
         self.optimizer = optimizer
@@ -52,8 +53,8 @@ class ERCModule(pl.LightningModule):
         try:
             labels = self.get_label(batch)
             result: dict = self.model(wav=batch["wav"],
-                            wav_mask=batch["wav_mask"],
-                            labels=labels)
+                                      wav_mask=batch["wav_mask"],
+                                      labels=labels)
             return result
         except RuntimeError:
             # For CUDA Device-side asserted error
@@ -61,24 +62,49 @@ class ERCModule(pl.LightningModule):
             logger.warn("Label given %s", labels)
             raise RuntimeError
 
-    def training_step(self, batch):
-        result = self.forward(batch)
-
-        self.acc(result['logits'], result['labels'])
-        self.log('train_acc/step', self.acc)
-        # self.auroc(result['logits'], result['labels'])
-        # self.log('train_acc/step', self.auroc)
-
+    def _sort_outputs(self, outputs: List[Dict]):
+        result = dict()
+        keys: list = outputs[0].keys()
+        for key in keys:
+            data = outputs[0][key]
+            if data.ndim == 0:
+                # Scalar value result
+                result[key] = torch.stack([o[key] for o in outputs])
+            elif data.ndim in [1, 2]:
+                # Batched 
+                result[key] = torch.concat([o[key] for o in outputs])
         return result
 
-    def training_epoch_end(self, outputs):
-        breakpoint()
-        total_loss = sum([output['loss'] for output in outputs]) / len(outputs)
-        total_logits = self.acc()
+    def log_result(
+        self, 
+        outputs: List[Dict] | dict, 
+        mode: erc.constants.RunMode | str = "train",
+        unit: str = "epoch"
+    ):
+        result = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
+        self.log(f"{unit}/{mode}_loss", torch.mean(result.get("loss", 0)))
+
+        self.acc(result.get("logits", 0), result.get("labels", -1))
+        self.log(f'{unit}/{mode}_acc', self.acc)
+
+        self.auroc(result.get("logits", 0), result.get("labels", -1))
+        self.log(f'{unit}/{mode}_auroc', self.auroc)
+
+    def training_step(self, batch):
+        result = self.forward(batch)
+        self.log_result(outputs=result, mode="train", unit="step")
+        return result
+
+    def training_epoch_end(self, outputs: List[Dict]):
+        self.log_result(outputs=outputs, mode="train", unit="epoch")
 
     def validation_step(self, batch):
         result = self.forward(batch)
+        self.log_result(outputs=result, mode="valid", unit="step")
         return result
+    
+    def validation_epoch_end(self, outputs: List[Dict]):
+        self.log_result(outputs=outputs, mode="valid", unit="epoch")
 
 
 def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
