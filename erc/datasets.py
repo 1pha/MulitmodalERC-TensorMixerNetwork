@@ -1,4 +1,5 @@
 import os
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Tuple
 
@@ -529,7 +530,7 @@ class HF_KEMD:
         if isinstance(paths, str | Path):
             # Single data given
             ds = self._load_dataset(path=paths)
-        elif isinstance(paths, list):
+        elif isinstance(paths, Iterable):
             ds = datasets.concatenate_datasets([self._load_dataset(path) for path in paths])
         else:
             logger.warn("Wrongly given dataset. %s", paths)
