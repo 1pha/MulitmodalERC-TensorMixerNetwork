@@ -2,6 +2,11 @@ from collections import OrderedDict
 from enum import Enum
 
 
+class Task(Enum):
+    CLS = "classification"
+    REG = "regression"
+
+
 class RunMode(Enum):
     TRAIN = "train"
     VALID = "valid"
@@ -18,6 +23,7 @@ emotion2idx = {
     "happy": 4,
     "sad": 5,
     "disgust": 6,
+    "disqust": 6,
 }
 
 # idx mapper to emotion

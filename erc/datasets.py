@@ -29,7 +29,8 @@ class KEMDBase(Dataset):
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
         validation_fold: int = 4,
-        mode: RunMode | str = RunMode.TRAIN
+        mode: RunMode | str = RunMode.TRAIN,
+        num_data: int = None,
     ):
         """
         Args:
@@ -54,7 +55,7 @@ class KEMDBase(Dataset):
             mode:
                 Train / valid / test mode.
         """
-        logger.info("Instantiate %s Dataset", self.NAME)
+        logger.debug("Instantiate %s Dataset", self.NAME)
         self.base_path: Path = Path(base_path)
         self.return_bio = return_bio
         self.max_length_wav = max_length_wav
@@ -67,9 +68,18 @@ class KEMDBase(Dataset):
         self.mode = RunMode[mode.upper()] if isinstance(mode, str) else mode
         self.df: pd.DataFrame = self.processed_db(generate_csv=generate_csv,
                                                   fold_num=validation_fold)
+        
+        # Limit number of data for debug (Fast Dev)
+        if isinstance(num_data, int):
+            if num_data in range(0, len(self.df)):
+                self.num_data = num_data
+            else:
+                self.num_data = round(0.05 * len(self.df))
+        else:
+            self.num_data = None
 
     def __len__(self):
-        return len(self.df)
+        return len(self.df) if not self.num_data else len(self.df[:self.num_data])
 
     def __getitem__(self, idx: int):
         """ Returns data dictionary.
@@ -115,9 +125,9 @@ class KEMDBase(Dataset):
         data["wav_mask"] = wav_mask
         
         # Txt File
-        # txt, txt_mask = self.get_txt(txt_path=txt_path, encoding=self.TEXT_ENCODING)
-        # data["txt"] = txt
-        # data["txt_mask"] = txt_mask
+        txt, txt_mask = self.get_txt(txt_path=txt_path, encoding=self.TEXT_ENCODING)
+        data["txt"] = txt
+        data["txt_mask"] = txt_mask
         
         # Bio Signals
         # Currently returns average signals across time elapse
@@ -166,30 +176,30 @@ class KEMDBase(Dataset):
         data, mask = self.pad_value(data.squeeze(), max_length=self.max_length_wav)
         return sampling_rate, data, mask
 
-    # def get_txt(self, txt_path: Path | str, encoding: str = None) -> Tuple[torch.Tensor, torch.Tensor]:
-    #     """ Get output feature vector from pre-trained txt model
-    #     :parameters:
-    #         txt_path: Path to text in Sessions
-    #         encoding: For KEMDy19, None. For KEMDy20_v1_1, cp949
-    #     TODO:
-    #         1. How to process special cases: /o /l 
-    #             -> They _maybe_ processed by pre-trained toeknizers
-    #         2. Which model to use
-    #     """
-    #     txt_path = check_exists(txt_path)
-    #     with open(txt_path, mode="r", encoding=encoding) as f:
-    #         txt: list = f.readlines()
-    #     # We assume there is a single line
-    #     txt: str = " ".join(txt)
-    #     result: dict = self.tokenizer(text=txt,
-    #                                   padding="max_length",
-    #                                   truncation="only_first",
-    #                                   max_length=self.max_length_txt,
-    #                                   return_attention_mask=True,
-    #                                   return_tensors="pt")
-    #     input_ids = result["input_ids"].squeeze()
-    #     mask = result["attention_mask"].squeeze()
-    #     return input_ids, mask
+    def get_txt(self, txt_path: Path | str, encoding: str = None) -> Tuple[torch.Tensor, torch.Tensor]:
+        """ Get output feature vector from pre-trained txt model
+        :parameters:
+            txt_path: Path to text in Sessions
+            encoding: For KEMDy19, None. For KEMDy20_v1_1, cp949
+        TODO:
+            1. How to process special cases: /o /l 
+                -> They _maybe_ processed by pre-trained toeknizers
+            2. Which model to use
+        """
+        txt_path = check_exists(txt_path)
+        with open(txt_path, mode="r", encoding=encoding) as f:
+            txt: list = f.readlines()
+        # We assume there is a single line
+        txt: str = " ".join(txt)
+        result: dict = self.tokenizer(text=txt,
+                                      padding="max_length",
+                                      truncation="only_first",
+                                      max_length=self.max_length_txt,
+                                      return_attention_mask=True,
+                                      return_tensors="pt")
+        input_ids = result["input_ids"].squeeze()
+        mask = result["attention_mask"].squeeze()
+        return input_ids, mask
 
     def processed_db(self, generate_csv: bool = False, fold_num: int = 4) -> pd.DataFrame:
         """ Reads in .csv file if exists.
@@ -265,7 +275,8 @@ class KEMDy19Dataset(KEMDBase):
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
         validation_fold: int = 4,
-        mode: RunMode | str = RunMode.TRAIN
+        mode: RunMode | str = RunMode.TRAIN,
+        num_data: int = None,
     ):
         super(KEMDy19Dataset, self).__init__(
             base_path,
@@ -275,7 +286,8 @@ class KEMDy19Dataset(KEMDBase):
             max_length_txt,
             tokenizer_name,
             validation_fold,
-            mode
+            mode,
+            num_data,
         )
 
     def merge_csv(
@@ -315,7 +327,8 @@ class KEMDy20Dataset(KEMDBase):
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
         validation_fold: int = 4,
-        mode: RunMode | str = RunMode.TRAIN
+        mode: RunMode | str = RunMode.TRAIN,
+        num_data: int = None,
     ):
         super(KEMDy20Dataset, self).__init__(
             base_path,
@@ -325,7 +338,8 @@ class KEMDy20Dataset(KEMDBase):
             max_length_txt,
             tokenizer_name,
             validation_fold,
-            mode
+            mode,
+            num_data,
         )
 
     def merge_csv(
@@ -372,20 +386,24 @@ class KEMDDataset(Dataset):
         max_length_wav: int = 200_000,
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
-        mode: RunMode | str = RunMode.TRAIN
+        mode: RunMode | str = RunMode.TRAIN,
+        num_data: int = None,
     ):
+        logger.info("Instantiate %s Dataset", mode)
         self.kemdy19 = KEMDy19Dataset(return_bio=return_bio,
                                       max_length_wav=max_length_wav,
                                       max_length_txt=max_length_txt,
                                       tokenizer_name=tokenizer_name,
                                       validation_fold=validation_fold,
-                                      mode=mode)
+                                      mode=mode,
+                                      num_data=num_data)
         self.kemdy20 = KEMDy20Dataset(return_bio=return_bio,
                                       max_length_wav=max_length_wav,
                                       max_length_txt=max_length_txt,
                                       tokenizer_name=tokenizer_name,
                                       validation_fold=validation_fold,
-                                      mode=mode)
+                                      mode=mode,
+                                      num_data=num_data)
 
     def __len__(self):
         return len(self.kemdy19) + len(self.kemdy20)
