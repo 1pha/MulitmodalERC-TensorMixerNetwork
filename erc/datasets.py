@@ -429,22 +429,30 @@ class HF_KEMD:
     def __init__(
         self,
         paths: list | str = ["kemdy19", "kemdy20"],
+        validation_fold: int = 4,
+        mode: RunMode | str = RunMode.TRAIN,
         wav_processor: str = "kresnik/wav2vec2-large-xlsr-korean",
         sampling_rate: int = 16_000,
         wav_max_length: int = 112_000, # 16_000 * 7, 7secs duration
         txt_processor: str = "klue/bert-base",
         txt_max_length: int = 64,
-        cache_file_name: str = "./cache/kemd_cache",
         load_from_cache_file: bool = True,
-        map_kwargs: dict = {},
+        num_proc: int = 8,
     ):
         """ Loads dataset and do pre-process
         Trunctae wav & text to designated maximum length
         Save to cache directory.
         Load from cache when cache_file_name is available.
-        This is required since a full run takes around 20 minutes.
+        This is required since a full run takes around 20 minutes with no `num_proc`
+        With `num_proc=8`, the whole process takes around 3 minutes.
         TODO: Check with DDP / Accelerate
         """
+        # This assertion is subject to change: number of folds to split
+        assert isinstance(validation_fold, int) and validation_fold in range(-1, 5),\
+            f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
+        self.validation_fold = validation_fold
+        self.mode = mode
+
         ds: datasets.arrow_dataset.Dataset = self.load_dataset(paths=paths)
         # Wave Processor
         self.wav_processor = AutoProcessor.from_pretrained(wav_processor) if wav_processor else None
@@ -473,11 +481,9 @@ class HF_KEMD:
             batched=True,
             desc="Pre-process wave & text",
             load_from_cache_file=load_from_cache_file,
-            cache_file_name=cache_file_name,
+            num_proc=num_proc,
         )
         self.ds = ds.map(self.preprocess, **map_kwargs).with_format("torch")
-        if cache_file_name:
-            datasets.Dataset.save_to_disk(dataset_path=cache_file_name)
 
     def __len__(self):
         return len(self.ds)
@@ -501,7 +507,19 @@ class HF_KEMD:
         If dataset does not exists, generate a new dataset. """
         ds = datasets.load_from_disk(path) if os.path.exists(path)\
              else run_generate_datasets(dataset_name=path)
+        if self.validation_fold > 0:
+            self.NUM_FOLDS = 5
+            self.NUM_SESSIONS = {"kemdy19": 20, "kemdy20": 40}[path]
+            ds = ds.filter(self.split_folds, input_columns=["id"], load_from_cache_file=False)
         return ds
+
+    def split_folds(self, _id: list):
+        fold_dict: dict = get_folds(num_session=self.NUM_SESSIONS, num_folds=self.NUM_FOLDS)
+        fold_range: range = fold_dict[self.validation_fold]
+        _id = int(_id.split("_")[0][-2:])
+        include: bool = not (_id in (fold_range)) if self.mode == RunMode.TRAIN else \
+                        _id in (fold_range)
+        return include
             
     def load_dataset(self, paths):
         if isinstance(paths, str | Path):

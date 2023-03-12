@@ -146,10 +146,11 @@ def generate_datasets(
     mode: str = 'train',
     validation_fold: int = -1,
     overrides: bool = False,
-    exclude_columns: list = None
+    exclude_columns: list = (),
 ) -> Dataset:
     # select columns
     column_dict = {
+        "segment_id": "id",
         "wav": "wav",
         "txt": "txt",
         "emotion": "label",
@@ -157,25 +158,21 @@ def generate_datasets(
         "arousal": "arousal",
         "gender": "gender,"
     }
+    for e in exclude_columns:
+        column_dict.pop(e)
     save_name = os.path.join(save_name,
                              f'{mode}_{validation_fold:02d}' if validation_fold > 0 else "")
 
     total_train_dataset_dict, num_error_cases = defaultdict(list), set()
     # Check existence
     if (os.path.exists(save_name) == False) or (overrides == True):
-        pbar = tqdm(iterable=dataset_)
-        for idx, data in enumerate(pbar):
-            total_train_dataset_dict["id"].append(idx) # give primary key
-            for key_, c_key_ in column_dict.items():
-                if key_ in data:
-                    total_train_dataset_dict[c_key_].append(data[key_])
-                else:
-                    # Skipping error 5 occuring casese from KEMDy19
-                    num_error_cases.add(idx)
-                    try:
-                        total_train_dataset_dict["id"].remove(idx)
-                    except:
-                        pass
+        for data in tqdm(iterable=dataset_):
+            if len(data) == 1:
+                # Error cases. Do not save
+                num_error_cases.add(data["segment_id"])
+                continue
+            for fetch_key, save_key in column_dict.items():
+                total_train_dataset_dict[save_key].append(data[fetch_key])
 
         # Generate dataset from dict and save 
         ds = Dataset.from_dict(total_train_dataset_dict)

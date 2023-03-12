@@ -135,6 +135,9 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
 
 def train(config: omegaconf.DictConfig) -> None:
     module: pl.LightningModule = setup_trainer(config)
-    logger = hydra.utils.instantiate(config.logger)
+    logger = hydra.utils.instantiate(
+        config.logger,
+        config=omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+    )
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer, logger=logger)
     trainer.fit(model=module)
