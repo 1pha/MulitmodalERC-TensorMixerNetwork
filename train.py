@@ -7,7 +7,7 @@ import erc
 logger = erc.utils.get_logger()
 
 
-@hydra.main(config_path="config", config_name="train.yaml")
+@hydra.main(config_path="config", config_name="train.yaml", version_base="1.1")
 def main(config: omegaconf.DictConfig):
     logger.info("Start Training")
     erc.trainer.train(config)

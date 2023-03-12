@@ -1,13 +1,15 @@
 from typing import List, Dict
 
-import torch
 import hydra
 import omegaconf
-from torch import nn
 import pytorch_lightning as pl
-from torchmetrics import Accuracy, AUROC
+import torch
+from torch import nn
+from torchmetrics import Accuracy, AUROC, ConcordanceCorrCoef
+import wandb
 
 import erc
+
 
 logger = erc.utils.get_logger()
 
@@ -29,6 +31,8 @@ class ERCModule(pl.LightningModule):
 
         self.acc = Accuracy(task="multiclass", num_classes=7)
         self.auroc = AUROC(task="multiclass", num_classes=7)
+        self.ccc = ConcordanceCorrCoef(num_outputs=2)
+        self.label_keys = list(erc.constants.emotion2idx.keys())[:-1]
         self.save_hyperparameters(ignore=["model"])
 
     def train_dataloader(self):
@@ -47,7 +51,12 @@ class ERCModule(pl.LightningModule):
             labels = batch["label"].long()
         elif task == erc.constants.Task.REG:
             # (batch_size, 2) | Float
-            labels = torch.hstack([batch["valence"], batch["arousal"]]).float()
+            labels = torch.stack([batch["valence"], batch["arousal"]], dim=1).float()
+        elif task == erc.constants.Task.ALL:
+            labels = {
+                "emotion": batch["label"].long(),
+                "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1).float(),
+            }
         return labels
 
     def forward(self, batch):
@@ -82,15 +91,42 @@ class ERCModule(pl.LightningModule):
         mode: erc.constants.RunMode | str = "train",
         unit: str = "epoch"
     ):
-        result = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
-        self.log(f"{unit}/{mode}_loss", torch.mean(result.get("loss", 0)))
+        result: dict = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
+        _lk = dict( # logging key
+            on_step=(unit == "step"),
+            on_epoch=(unit == "epoch"),
+            prog_bar=True
+        )
+        # Log Losses
+        for loss_key in ["loss", "cls_loss", "reg_loss"]:
+            if loss_key in result:
+                self.log(f"{unit}/{mode}_{loss_key}", torch.mean(result.get(loss_key, 0)), **_lk)
 
-        self.acc(result.get("logits", 0), result.get("labels", -1))
-        self.log(f'{unit}/{mode}_acc', self.acc)
+        # Log Classification Metrics
+        if "cls_pred" in result and "emotion" in result:
+            # Log Accuracy
+            self.acc(result["cls_pred"], result["emotion"])
+            self.log(f'{unit}/{mode}_acc', self.acc, **_lk)
 
-        if mode == "epoch":
-            self.auroc(result.get("logits", 0), result.get("labels", -1))
-            self.log(f'{unit}/{mode}_auroc', self.auroc)
+            # Log AUROC
+            if mode == "epoch":
+                self.auroc(result["cls_pred"], result["emotion"])
+                self.log(f'{unit}/{mode}_auroc', self.auroc, **_lk)
+
+        # Log Regression Metrics
+        if "reg_pred" in result and "regress" in result:
+            val, aro = self.ccc(result["reg_pred"], result["regress"])
+            self.log(f"{unit}/{mode}_ccc(val)", val, **_lk)
+            self.log(f"{unit}/{mode}_ccc(aro)", aro, **_lk)
+        return result
+    
+    def log_confusion_matrix(self, result: dict):
+        preds = result["cls_pred"].argmax(dim=1).cpu().detach().numpy()
+        labels = result["emotion"].cpu().numpy()
+        cf = wandb.plot.confusion_matrix(y_true=labels,
+                                         preds=preds,
+                                         class_names=self.label_keys)
+        self.logger.experiment.log({"confusion_matrix": cf})
 
     def training_step(self, batch):
         result = self.forward(batch)
@@ -98,15 +134,16 @@ class ERCModule(pl.LightningModule):
         return result
 
     def training_epoch_end(self, outputs: List[Dict]):
-        self.log_result(outputs=outputs, mode="train", unit="epoch")
+        result = self.log_result(outputs=outputs, mode="train", unit="epoch")
+        self.log_confusion_matrix(result)
 
-    def validation_step(self, batch):
+    def validation_step(self, batch, batch_idx):
         result = self.forward(batch)
-        self.log_result(outputs=result, mode="valid", unit="step")
         return result
     
     def validation_epoch_end(self, outputs: List[Dict]):
-        self.log_result(outputs=outputs, mode="valid", unit="epoch")
+        result = self.log_result(outputs=outputs, mode="valid", unit="epoch")
+        self.log_confusion_matrix(result)
 
 
 def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
@@ -132,14 +169,18 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
                                       scheduler=sch,
                                       train_loader=train_loader,
                                       valid_loader=valid_loader)
-    return module
+    return module, train_loader, valid_loader
 
 
 def train(config: omegaconf.DictConfig) -> None:
-    module: pl.LightningModule = setup_trainer(config)
+    module, train_loader, valid_loader = setup_trainer(config)
     logger = hydra.utils.instantiate(
         config.logger,
         # config=omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     )
+    logger.watch(module)
+    wandb.config.update(
+        omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+    )
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer, logger=logger)
-    trainer.fit(model=module)
+    trainer.fit(model=module, train_dataloaders=train_loader, val_dataloaders=valid_loader)

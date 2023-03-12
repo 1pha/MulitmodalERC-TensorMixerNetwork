@@ -8,3 +8,4 @@ txt_processor: klue/bert-base
 txt_max_length: 64
 load_from_cache_file: True
 num_proc: 8
+num_data: False

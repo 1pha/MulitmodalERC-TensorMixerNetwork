@@ -439,6 +439,7 @@ class HF_KEMD:
         txt_max_length: int = 64,
         load_from_cache_file: bool = True,
         num_proc: int = 8,
+        num_data: int = None,
     ):
         """ Loads dataset and do pre-process
         Trunctae wav & text to designated maximum length
@@ -486,9 +487,18 @@ class HF_KEMD:
             num_proc=num_proc,
         )
         self.ds = ds.map(self.preprocess, **map_kwargs).with_format("torch")
+        # Limit number of data for debug (Fast Dev)
+        if isinstance(num_data, int):
+            if num_data in range(0, len(self.ds)):
+                self.num_data = num_data
+            else:
+                self.num_data = round(0.05 * len(self.ds))
+        else:
+            self.num_data = None
+        logger.info("# %s Data: %s", mode.capitalize(), len(self))
 
     def __len__(self):
-        return len(self.ds)
+        return len(self.ds) if not self.num_data else len(self.ds[:self.num_data])
 
     def __getitem__(self, idx: int):
         return self.ds[idx]
