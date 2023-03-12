@@ -60,7 +60,7 @@ class KEMDBase(Dataset):
         self.return_bio = return_bio
         self.max_length_wav = max_length_wav
         self.max_length_txt = max_length_txt
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name) if tokenizer_name else None
         # This assertion is subject to change: number of folds to split
         assert isinstance(validation_fold, int) and validation_fold in range(-1, 5),\
             f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
@@ -173,7 +173,13 @@ class KEMDBase(Dataset):
         """
         wav_path = check_exists(wav_path)
         data, sampling_rate = torchaudio.load(wav_path)
-        data, mask = self.pad_value(data.squeeze(), max_length=self.max_length_wav)
+        if self.max_length_wav:
+            # If self.max_length_wav is given, return a padded value
+            # Else, just return naive wav file.
+            data, mask = self.pad_value(data.squeeze(), max_length=self.max_length_wav)
+        else:
+            data = data.squeeze()
+            mask = None
         return sampling_rate, data, mask
 
     def get_txt(self, txt_path: Path | str, encoding: str = None) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -191,15 +197,18 @@ class KEMDBase(Dataset):
             txt: list = f.readlines()
         # We assume there is a single line
         txt: str = " ".join(txt)
-        result: dict = self.tokenizer(text=txt,
-                                      padding="max_length",
-                                      truncation="only_first",
-                                      max_length=self.max_length_txt,
-                                      return_attention_mask=True,
-                                      return_tensors="pt")
-        input_ids = result["input_ids"].squeeze()
-        mask = result["attention_mask"].squeeze()
-        return input_ids, mask
+        if self.tokenizer:
+            result: dict = self.tokenizer(text=txt,
+                                        padding="max_length",
+                                        truncation="only_first",
+                                        max_length=self.max_length_txt,
+                                        return_attention_mask=True,
+                                        return_tensors="pt")
+            input_ids = result["input_ids"].squeeze()
+            mask = result["attention_mask"].squeeze()
+            return input_ids, mask
+        else:
+            return txt, None
 
     def processed_db(self, generate_csv: bool = False, fold_num: int = 4) -> pd.DataFrame:
         """ Reads in .csv file if exists.
