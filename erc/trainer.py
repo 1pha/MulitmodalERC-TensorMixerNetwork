@@ -23,11 +23,8 @@ class ERCModule(pl.LightningModule):
                  scheduler: torch.optim.lr_scheduler._LRScheduler,
                  train_loader: torch.utils.data.DataLoader,
                  valid_loader: torch.utils.data.DataLoader,
-                 move_metrics_to_cpu: bool = False):
+                 ):
         super().__init__()
-        self.move_metrics_to_cpu = move_metrics_to_cpu
-        self.metric_device = "cpu" if move_metrics_to_cpu else self.device
-
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -73,7 +70,6 @@ class ERCModule(pl.LightningModule):
             result: dict = self.model(wav=batch["wav"],
                                       wav_mask=batch["wav_mask"],
                                       labels=labels)
-            result["cls_pred"] = result["cls_pred"].argmax(dim=1)
             return result
         except RuntimeError:
             # For CUDA Device-side asserted error
@@ -81,9 +77,9 @@ class ERCModule(pl.LightningModule):
             logger.warn("Label given %s", labels)
             raise RuntimeError
 
-    def _sort_outputs(self, outputs: List[Dict], slim_output: bool = False):
+    def _sort_outputs(self, outputs: List[Dict]):
         result = dict()
-        keys: list = ["loss", "cls_pred","emotion"] if slim_output else outputs[0].keys()
+        keys: list = outputs[0].keys()
         for key in keys:
             data = outputs[0][key]
             if data.ndim == 0:
@@ -119,9 +115,10 @@ class ERCModule(pl.LightningModule):
             self.ccc_aro(result["reg_pred"][:, 1], result["regress"][:, 1])
         self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val)
         self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro)
+        return result
         
     def log_confusion_matrix(self, result: dict):
-        preds = result["cls_pred"].cpu().detach().numpy()
+        preds = result["cls_pred"].argmax(dim=1).cpu().detach().numpy()
         labels = result["emotion"].cpu().numpy()
         cf = wandb.plot.confusion_matrix(y_true=labels,
                                          preds=preds,
@@ -130,22 +127,20 @@ class ERCModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         result = self.forward(batch)
-        self.log_result(outputs=result, mode="train", unit="step")
+        result = self.log_result(outputs=result, mode="train", unit="step")
         return result
 
     def training_epoch_end(self, outputs: List[Dict]):
-        self.log_result(outputs=outputs, mode="train", unit="epoch")
-        result = self._sort_outputs(outputs=outputs, slim_output=True)
+        result = self.log_result(outputs=outputs, mode="train", unit="epoch")
         self.log_confusion_matrix(result)
 
     def validation_step(self, batch, batch_idx):
         result = self.forward(batch)
-        self.log_result(outputs=result, mode="valid", unit="step")
+        result = self.log_result(outputs=result, mode="valid", unit="step")
         return result
     
     def validation_epoch_end(self, outputs: List[Dict]):
-        self.log_result(outputs=outputs, mode="valid", unit="epoch")
-        result = self._sort_outputs(outputs=outputs, slim_output=True)
+        result = self.log_result(outputs=outputs, mode="valid", unit="epoch")
         self.log_confusion_matrix(result)
 
 
