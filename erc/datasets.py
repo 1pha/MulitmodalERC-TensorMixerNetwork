@@ -452,7 +452,8 @@ class HF_KEMD:
         assert isinstance(validation_fold, int) and validation_fold in range(-1, 5),\
             f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
         self.validation_fold = validation_fold
-        self.mode = mode
+        logger.info("Load %s Huggingface KEMD Dataset", mode)
+        self.mode = RunMode[mode.upper()] if isinstance(mode, str) else mode
 
         ds: datasets.arrow_dataset.Dataset = self.load_dataset(paths=paths)
         # Wave Processor
