@@ -7,5 +7,5 @@ dataset:
   wav_max_length: 112_000 # 16_000 * 7, 7secs duration
   txt_processor: klue/bert-base
   txt_max_length: 64
-  cache_file_name: ./cache/kemd_cache
   load_from_cache_file: True
+  num_proc: 8
