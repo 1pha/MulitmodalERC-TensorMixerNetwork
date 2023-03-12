@@ -29,6 +29,7 @@ class ERCModule(pl.LightningModule):
 
         self.acc = Accuracy(task="multiclass", num_classes=7)
         self.auroc = AUROC(task="multiclass", num_classes=7)
+        self.save_hyperparameters(ignore=["model"])
 
     def train_dataloader(self):
         return self.train_loader
@@ -43,7 +44,7 @@ class ERCModule(pl.LightningModule):
         task = task or self.model.TASK
         if task == erc.constants.Task.CLS:
             # (batch_size,) | Long
-            labels = batch["emotion"].long()
+            labels = batch["label"].long()
         elif task == erc.constants.Task.REG:
             # (batch_size, 2) | Float
             labels = torch.hstack([batch["valence"], batch["arousal"]]).float()
@@ -87,8 +88,9 @@ class ERCModule(pl.LightningModule):
         self.acc(result.get("logits", 0), result.get("labels", -1))
         self.log(f'{unit}/{mode}_acc', self.acc)
 
-        self.auroc(result.get("logits", 0), result.get("labels", -1))
-        self.log(f'{unit}/{mode}_auroc', self.auroc)
+        if mode == "epoch":
+            self.auroc(result.get("logits", 0), result.get("labels", -1))
+            self.log(f'{unit}/{mode}_auroc', self.auroc)
 
     def training_step(self, batch):
         result = self.forward(batch)
@@ -137,7 +139,7 @@ def train(config: omegaconf.DictConfig) -> None:
     module: pl.LightningModule = setup_trainer(config)
     logger = hydra.utils.instantiate(
         config.logger,
-        config=omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+        # config=omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     )
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer, logger=logger)
     trainer.fit(model=module)

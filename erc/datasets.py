@@ -481,7 +481,7 @@ class HF_KEMD:
         # Pre-process
         map_kwargs = dict(
             batched=True,
-            desc="Pre-process wave & text",
+            desc=f"Pre-process wave & text {mode}",
             load_from_cache_file=load_from_cache_file,
             num_proc=num_proc,
         )
