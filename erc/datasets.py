@@ -505,8 +505,12 @@ class HF_KEMD:
     def _load_dataset(self, path: str | Path):
         """ Loads huggingface dataset saved in .arr(feather) 
         If dataset does not exists, generate a new dataset. """
-        ds = datasets.load_from_disk(path) if os.path.exists(path)\
-             else run_generate_datasets(dataset_name=path)
+        if os.path.exists(path):
+            logger.info("Load from disk, %s", path)
+            ds = datasets.load_from_disk(path)
+        else:
+            logger.info("HF Dataset not found. Newly save from scratch. Path: %s", path)
+            ds = run_generate_datasets(dataset_name=path)
         if self.validation_fold > 0:
             self.NUM_FOLDS = 5
             self.NUM_SESSIONS = {"kemdy19": 20, "kemdy20": 40}[path]
@@ -528,6 +532,7 @@ class HF_KEMD:
         elif isinstance(paths, list):
             ds = datasets.concatenate_datasets([self._load_dataset(path) for path in paths])
         else:
+            logger.warn("Wrongly given dataset. %s", paths)
             raise FileNotFoundError
         return ds
 
