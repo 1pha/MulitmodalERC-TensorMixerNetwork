@@ -65,11 +65,14 @@ class ERCModule(pl.LightningModule):
         result = self.forward(batch)
 
         self.acc(result['logits'], result['labels'])
-        self.log('train_acc_step', self.acc)
+        self.log('train_acc/step', self.acc)
+        # self.auroc(result['logits'], result['labels'])
+        # self.log('train_acc/step', self.auroc)
 
         return result
 
     def training_epoch_end(self, outputs):
+        breakpoint()
         total_loss = sum([output['loss'] for output in outputs]) / len(outputs)
         total_logits = self.acc()
 
@@ -107,5 +110,5 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
 def train(config: omegaconf.DictConfig) -> None:
     module: pl.LightningModule = setup_trainer(config)
     logger = hydra.utils.instantiate(config.logger)
-    trainer = hydra.utils.instantiate(config.trainer, logger=logger)
+    trainer: pl.Trainer = hydra.utils.instantiate(config.trainer, logger=logger)
     trainer.fit(model=module)
