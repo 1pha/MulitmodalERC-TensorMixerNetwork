@@ -62,8 +62,8 @@ class WavOnly(ModelBase):
             "loss": total_loss,
             "cls_loss": cls_loss.cpu(),
             "reg_loss": reg_loss.cpu(),
-            "emotion": labels["emotion"].detach().cpu(),
-            "regress": labels["regress"].detach().cpu(),
-            "cls_pred": cls_logits.detach().cpu(),
-            "reg_pred": reg_logits.detach().cpu(),
+            "emotion": labels["emotion"].detach(),
+            "regress": labels["regress"].detach(),
+            "cls_pred": cls_logits.detach(),
+            "reg_pred": reg_logits.detach(),
         }

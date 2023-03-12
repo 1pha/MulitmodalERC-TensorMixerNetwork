@@ -37,3 +37,5 @@ trainer:
   max_epochs: 200
   devices: 1
   accelerator: gpu
+  gradient_clip_val: 1
+  move_metrics_to_cpu: True

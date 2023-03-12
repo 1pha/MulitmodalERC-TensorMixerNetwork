@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 import torch
 from torch import nn
 import torchmetrics.functional as tof
+from torchmetrics import Accuracy, AUROC, ConcordanceCorrCoef
 import wandb
 
 import erc
@@ -28,6 +29,11 @@ class ERCModule(pl.LightningModule):
 
         self.train_loader = train_loader
         self.valid_loader = valid_loader
+
+        self.acc = Accuracy(task="multiclass", num_classes=7)
+        self.auroc = AUROC(task="multiclass", num_classes=7)
+        self.ccc_val = ConcordanceCorrCoef(num_outputs=1)
+        self.ccc_aro = ConcordanceCorrCoef(num_outputs=1)
 
         self.label_keys = list(erc.constants.emotion2idx.keys())[:-1]
         self.save_hyperparameters(ignore=["model"])
@@ -83,6 +89,37 @@ class ERCModule(pl.LightningModule):
         return result
 
     def log_result(
+        self, 
+        outputs: List[Dict] | dict, 
+        mode: erc.constants.RunMode | str = "train",
+        unit: str = "epoch"
+    ):
+        result: dict = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
+        # Log Losses
+        for loss_key in ["loss", "cls_loss", "reg_loss"]:
+            if loss_key in result:
+                self.log(f"{unit}/{mode}_{loss_key}", torch.mean(result.get(loss_key, 0)), prog_bar=True)
+
+        # Log Classification Metrics
+        if "cls_pred" in result and "emotion" in result:
+            # Log Accuracy
+            self.acc(preds=result["cls_pred"], target=result["emotion"])
+            self.log(f'{unit}/{mode}_acc', self.acc, prog_bar=True)
+
+            # Log AUROC
+            if mode == "epoch":
+                self.auroc(preds=result["cls_pred"], target=result["emotion"])
+                self.log(f'{unit}/{mode}_auroc', self.auroc, prog_bar=True)
+
+        # Log Regression Metrics
+        if "reg_pred" in result and "regress" in result:
+            self.ccc_val.update(result["reg_pred"][:, 0], result["regress"][:, 0])
+            self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val, prog_bar=True)
+            self.ccc_aro.update(result["reg_pred"][:, 1], result["regress"][:, 1])
+            self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro, prog_bar=True)
+        return result
+    
+    def log_result_fn(
         self, 
         outputs: List[Dict] | dict, 
         mode: erc.constants.RunMode | str = "train",
