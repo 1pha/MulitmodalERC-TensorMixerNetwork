@@ -17,3 +17,4 @@ fire
 jiwer
 datasets
 accelerate
+wandb

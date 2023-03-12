@@ -3,6 +3,7 @@ import hydra
 import omegaconf
 from torch import nn
 import pytorch_lightning as pl
+from torchmetrics import Accuracy, AUROC
 
 import erc
 
@@ -25,6 +26,9 @@ class ERCModule(pl.LightningModule):
         self.train_loader = train_loader
         self.valid_loader = valid_loader
 
+        self.acc = Accuracy(task="multiclass", num_classes=7)
+        self.auroc = AUROC(task="multiclass", num_classes=7)
+
     def train_dataloader(self):
         return self.train_loader
 
@@ -38,34 +42,40 @@ class ERCModule(pl.LightningModule):
         task = task or self.model.TASK
         if task == erc.constants.Task.CLS:
             # (batch_size,) | Long
-            label = batch["emotion"].long()
+            labels = batch["emotion"].long()
         elif task == erc.constants.Task.REG:
             # (batch_size, 2) | Float
-            label = torch.hstack([batch["valence"], batch["arousal"]]).float()
-        return label
+            labels = torch.hstack([batch["valence"], batch["arousal"]]).float()
+        return labels
 
     def forward(self, batch):
         try:
-            label = self.get_label(batch)
-            loss = self.model(wav=batch["wav"],
+            labels = self.get_label(batch)
+            result: dict = self.model(wav=batch["wav"],
                             wav_mask=batch["wav_mask"],
-                            label=label)
+                            labels=labels)
+            return result
         except RuntimeError:
             # For CUDA Device-side asserted error
-            print(f"Label given {label}")
-            logger.warn("Label given %s", label)
-        return loss
+            print(f"Label given {labels}")
+            logger.warn("Label given %s", labels)
+            raise RuntimeError
 
     def training_step(self, batch):
-        loss = self.forward(batch)
-        return loss
+        result = self.forward(batch)
+
+        self.acc(result['logits'], result['labels'])
+        self.log('train_acc_step', self.acc)
+
+        return result
 
     def training_epoch_end(self, outputs):
-        breakpoint()
+        total_loss = sum([output['loss'] for output in outputs]) / len(outputs)
+        total_logits = self.acc()
 
     def validation_step(self, batch):
-        loss = self.forward(batch)
-        return loss
+        result = self.forward(batch)
+        return result
 
 
 def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
@@ -96,5 +106,6 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
 
 def train(config: omegaconf.DictConfig) -> None:
     module: pl.LightningModule = setup_trainer(config)
-    trainer = hydra.utils.instantiate(config.trainer)
+    logger = hydra.utils.instantiate(config.logger)
+    trainer = hydra.utils.instantiate(config.trainer, logger=logger)
     trainer.fit(model=module)
