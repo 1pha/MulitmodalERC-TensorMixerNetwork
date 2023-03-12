@@ -527,6 +527,8 @@ class HF_KEMD:
             ds = self._load_dataset(path=paths)
         elif isinstance(paths, list):
             ds = datasets.concatenate_datasets([self._load_dataset(path) for path in paths])
+        else:
+            raise FileNotFoundError
         return ds
 
 

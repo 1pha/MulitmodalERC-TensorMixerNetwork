@@ -1,6 +1,6 @@
 dataset:
   _target_: erc.datasets.HF_KEMD
-  paths: [ kemdy19, kemdy29 ]
+  paths: [ kemdy19, kemdy20 ]
   validation_fold: 4
   wav_processor: kresnik/wav2vec2-large-xlsr-korean
   sampling_rate: 16_000
