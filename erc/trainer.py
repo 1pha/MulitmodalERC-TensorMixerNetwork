@@ -5,7 +5,7 @@ import omegaconf
 import pytorch_lightning as pl
 import torch
 from torch import nn
-from torchmetrics import Accuracy, AUROC, ConcordanceCorrCoef
+import torchmetrics.functional as tof
 import wandb
 
 import erc
@@ -29,9 +29,6 @@ class ERCModule(pl.LightningModule):
         self.train_loader = train_loader
         self.valid_loader = valid_loader
 
-        self.acc = Accuracy(task="multiclass", num_classes=7)
-        self.auroc = AUROC(task="multiclass", num_classes=7)
-        self.ccc = ConcordanceCorrCoef(num_outputs=2)
         self.label_keys = list(erc.constants.emotion2idx.keys())[:-1]
         self.save_hyperparameters(ignore=["model"])
 
@@ -92,32 +89,36 @@ class ERCModule(pl.LightningModule):
         unit: str = "epoch"
     ):
         result: dict = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
-        _lk = dict( # logging key
-            on_step=(unit == "step"),
-            on_epoch=(unit == "epoch"),
-            prog_bar=True
-        )
         # Log Losses
         for loss_key in ["loss", "cls_loss", "reg_loss"]:
             if loss_key in result:
-                self.log(f"{unit}/{mode}_{loss_key}", torch.mean(result.get(loss_key, 0)), **_lk)
+                self.log(f"{unit}/{mode}_{loss_key}", torch.mean(result.get(loss_key, 0)), prog_bar=True)
 
         # Log Classification Metrics
         if "cls_pred" in result and "emotion" in result:
             # Log Accuracy
-            self.acc(result["cls_pred"], result["emotion"])
-            self.log(f'{unit}/{mode}_acc', self.acc, **_lk)
+            acc = tof.accuracy(preds=result["cls_pred"],
+                               target=result["emotion"],
+                               task="multiclass",
+                               num_classes=7)
+            self.log(f'{unit}/{mode}_acc', acc, prog_bar=True)
 
             # Log AUROC
             if mode == "epoch":
-                self.auroc(result["cls_pred"], result["emotion"])
-                self.log(f'{unit}/{mode}_auroc', self.auroc, **_lk)
+                auroc = tof.auroc(preds=result["cls_pred"],
+                                  target=result["emotion"],
+                                  task="multiclass",
+                                  num_classes=7)
+                self.log(f'{unit}/{mode}_auroc', auroc, prog_bar=True)
 
         # Log Regression Metrics
         if "reg_pred" in result and "regress" in result:
-            val, aro = self.ccc(result["reg_pred"], result["regress"])
-            self.log(f"{unit}/{mode}_ccc(val)", val, **_lk)
-            self.log(f"{unit}/{mode}_ccc(aro)", aro, **_lk)
+            ccc_val = tof.concordance_corrcoef(preds=result["reg_pred"][:, 0],
+                                               target=result["regress"][:, 0])
+            self.log(f"{unit}/{mode}_ccc(val)", ccc_val, prog_bar=True)
+            ccc_aro = tof.concordance_corrcoef(preds=result["reg_pred"][:, 1],
+                                               target=result["regress"][:, 1])
+            self.log(f"{unit}/{mode}_ccc(aro)", ccc_aro, prog_bar=True)
         return result
     
     def log_confusion_matrix(self, result: dict):

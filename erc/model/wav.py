@@ -22,29 +22,9 @@ class WavCls(ModelBase):
         output = self.model(input_values=wav, attention_mask=wav_mask, labels=labels)
         return {
             'loss': output['loss'],
-            'labels': labels.detach().cpu(),
-            'logits': output['logits'].detach().cpu(),
+            'emotion': labels.detach().cpu(),
+            'cls_pred': output['logits'].detach().cpu(),
         }
-
-
-class WavReg(ModelBase):
-    TASK = Task.REG
-    def __init__(self, config: str, criterion: torch.nn.Module, config_kwargs: dict = None):
-        super().__init__()
-        if config_kwargs is None:
-            config_kwargs = dict()
-            config_kwargs["num_labels"] = 2 # Default emotion classification label
-        self.model = Wav2Vec2ForSequenceClassification.from_pretrained(config, **config_kwargs)
-        self.criterion = criterion
-
-    def forward(self, wav: torch.Tensor, wav_mask: torch.Tensor, label: torch.Tensor = None):
-        result = {}
-        # We retrieve logits directly in order to avoid last_hidden_state memory allocation issue
-        logits = self.model(input_values=wav, attention_mask=wav_mask).logits
-        if label is not None:
-            loss = self.criterion(logits, label.float())
-            result["loss"] = loss
-        return result
 
 
 class WavOnly(ModelBase):
@@ -80,10 +60,10 @@ class WavOnly(ModelBase):
         total_loss = cls_loss * self.cls_coef + reg_loss * self.reg_coef
         return {
             "loss": total_loss,
-            "cls_loss": cls_loss,
-            "reg_loss": reg_loss,
-            "emotion": labels["emotion"].detach(),
-            "regress": labels["regress"].detach(),
-            "cls_pred": cls_logits,
-            "reg_pred": reg_logits,
+            "cls_loss": cls_loss.cpu(),
+            "reg_loss": reg_loss.cpu(),
+            "emotion": labels["emotion"].detach().cpu(),
+            "regress": labels["regress"].detach().cpu(),
+            "cls_pred": cls_logits.detach().cpu(),
+            "reg_pred": reg_logits.detach().cpu(),
         }
