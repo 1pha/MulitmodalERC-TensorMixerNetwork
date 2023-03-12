@@ -9,6 +9,7 @@ from collections import defaultdict
 import torch 
 from datasets import Dataset, load_from_disk
 
+import erc
 from erc.utils import get_logger
 from erc.constants import columns_kemdy19, columns_kemdy20
 
@@ -50,6 +51,7 @@ def eda_preprocess(file_path: str) -> pd.DataFrame:
 def merge_csv_kemdy19(
     base_path: str | Path = "./data/KEMDy19",
     save_path: str | Path = "./data/kemdy19.csv",
+    exclude_multilabel: bool = True,
 ) -> pd.DataFrame:
     """ Merges all .csv files to create integrated single dataframe for all segments and sessions.
     Iterates `base_path` annotation directory and reads in seperated csvs.
@@ -94,14 +96,17 @@ def merge_csv_kemdy19(
     
     logger.info(f"New dataframe saved as {save_path}")
     total_df.columns = list(columns_kemdy19.values())
-    total_df = total_df[~total_df['emotion'].str.contains(';')]
-    total_df.to_csv(save_path, index=False)
+    if exclude_multilabel:
+        total_df = total_df[~total_df['emotion'].str.contains(';')]
+    if save_path:
+        total_df.to_csv(save_path, index=False)
     return total_df
 
 
 def merge_csv_kemdy20(
     base_path: str | Path = "./data/KEMDy20_v1_1",
     save_path: str | Path = "./data/kemdy20.csv",
+    exclude_multilabel: bool = True,
 ) -> pd.DataFrame:
     """ Merges all .csv files to create integrated single dataframe for all segments and sessions.
     Iterates `base_path` annotation directory and reads in seperated csvs.
@@ -128,40 +133,69 @@ def merge_csv_kemdy20(
     
     logger.info(f"New dataframe saved as {save_path}")
     total_df.columns = list(columns_kemdy20.values())
-    total_df = total_df[~total_df['emotion'].str.contains(';')]
-    total_df.to_csv(save_path, index=False)
+    if exclude_multilabel:
+        total_df = total_df[~total_df['emotion'].str.contains(';')]
+    if save_path:
+        total_df.to_csv(save_path, index=False)
     return total_df
 
 
 def generate_datasets(
-        dataset_ : torch.utils.data.Dataset, 
-        save_name : str = 'audio_dataset_19',
-        mode : str = 'train',
-        validation_fold : int = 4,
-        overrides : bool = False,
-    ) -> Dataset:
-    # select columns 
-    origin_name = ['wav', 'wav_mask', 'emotion', 'valence', 'arousal', 'gender'][:3]
-    convert_name = ['input_values', 'attention_mask', 'label','valence','arousal', 'gender'][:3]
-    save_name = os.path.join(save_name, f'{mode}_{validation_fold:02d}')
-    
-    total_train_dataset_dict = defaultdict(list)
+    dataset_: torch.utils.data.Dataset, 
+    save_name: str = 'audio_dataset_19',
+    mode: str = 'train',
+    validation_fold: int = -1,
+    overrides: bool = False,
+    exclude_columns: list = (),
+) -> Dataset:
+    # select columns
+    column_dict = {
+        "segment_id": "id",
+        "wav": "wav",
+        "txt": "txt",
+        "emotion": "label",
+        "valence": "valence",
+        "arousal": "arousal",
+        "gender": "gender,"
+    }
+    for e in exclude_columns:
+        column_dict.pop(e)
+    save_name = os.path.join(save_name,
+                             f'{mode}_{validation_fold:02d}' if validation_fold > 0 else "")
 
-    # check existance 
-    if (os.path.exists(save_name) == False) or (overrides==True):
+    total_train_dataset_dict, num_error_cases = defaultdict(list), set()
+    # Check existence
+    if (os.path.exists(save_name) == False) or (overrides == True):
+        for data in tqdm(iterable=dataset_):
+            if len(data) == 1:
+                # Error cases. Do not save
+                num_error_cases.add(data["segment_id"])
+                continue
+            for fetch_key, save_key in column_dict.items():
+                total_train_dataset_dict[save_key].append(data[fetch_key])
 
-        pbar = tqdm(total = len(dataset_)+1)
-        for idx, batch in enumerate(dataset_):
-            total_train_dataset_dict["id"].append(idx) # give primary key_
-            for key_, c_key_ in zip(origin_name, convert_name):
-                
-                total_train_dataset_dict[c_key_].append(batch[key_])
-            pbar.update(1)
-        
-        # generage dataset from dict and save 
+        # Generate dataset from dict and save 
         ds = Dataset.from_dict(total_train_dataset_dict)
         ds.save_to_disk(save_name)
-                        
     else:
         ds = load_from_disk(save_name).with_format("torch")
+    return ds
+
+
+def run_generate_datasets(dataset_name="kemdy19"):
+    """ Loadds torch dataset and dump it into huggingface dataset
+    This is utilize huggingface datasets' `map` method.
+    This function will override existing datasets."""
+
+    _ds_kwargs = {
+        "tokenizer_name": None, "max_length_wav": None, "validation_fold": -1
+    }
+    dataset_: torch.utils.data.Dataset = {
+        "kemdy19": erc.datasets.KEMDy19Dataset(**_ds_kwargs),
+        "kemdy20": erc.datasets.KEMDy20Dataset(**_ds_kwargs),
+    }[dataset_name]
+    ds = generate_datasets(dataset_=dataset_,
+                           validation_fold=-1,
+                           save_name=dataset_name,
+                           overrides=True,)
     return ds

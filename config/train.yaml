@@ -3,22 +3,13 @@ hydra:
     chdir: False  # keep hydra = 1.1 change directory behavior
   
 defaults:
+  - dataset: hf
   - model: classify
-
-dataset:
-  _target_: erc.datasets.KEMDDataset
-  return_bio: False
-  # max_length_wav / 16_000 = duration(sec)
-  max_length_wav: 80_000
-  max_length_txt: 50
-  tokenizer_name: klue/bert-base
-  validation_fold: 4
-  num_data: False # To Debug 
 
 dataloader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 8
-  num_workers: 1
+  batch_size: 16
+  num_workers: 4
   dataset: ${dataset}
 
 optim:
@@ -31,7 +22,6 @@ misc:
   seed: 42
   debug: False
   # "w11wo/wav2vec2-xls-r-300m-korean" for other pre-trained
-
 
 module:
   _target_: erc.trainer.ERCModule
@@ -47,3 +37,7 @@ trainer:
   max_epochs: 200
   devices: 1
   accelerator: gpu
+  gradient_clip_val: 1
+  # limit_train_batches: 0.001
+  # limit_val_batches: 0.01
+  # log_every_n_steps: 2

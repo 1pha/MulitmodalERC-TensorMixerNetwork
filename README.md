@@ -12,7 +12,7 @@ Data contains 3 modalities
 
 ## Code
 ### Basic Setups
-```bash
+```zsh
 (base) conda create -n erc python=3.10
 (base) conda activate erc
 (erc) chmod +x ./setup.sh
@@ -22,9 +22,13 @@ Data contains 3 modalities
 Put data and source codes on the same hierarchy. Prevent hard copy and use soft-link: `ln -s ACTUAL_DATA_PATH data`
 
 ### Training
-With default configuration of []
+With default configuration of [./config/train.yaml]
 ```zsh
 python train.py
+```
+Predicting both emotion and regression
+```zsh
+python train.py model=combined
 ```
 
 **Fast Dev**:
@@ -35,20 +39,30 @@ python train.py dataset.num_data=4 dataloader.batch_size=4 trainer.accelerator=c
 
 ### Testing Functions
 
-One may need to test a specific function on CLI. Writing an extra script for such temporal task is very nagging. Use `fire` library to boost-up productivity.
+One may need to test a specific function on CLI. Writing an extra script for such temporal task is very nagging. Use **`fire` library** to boost-up productivity.
 
+#### Merge `.csv`
 For example, if one needs to test [`preprocess.make_total_df`](erc/preprocess.py) on CLI, try the following -
-```bash
+```zsh
 (erc) python -m fire erc.preprocess make_total_df --base_path="./data/KEMDy19"
+```
+#### Create huggingface `datasets`
+```zsh
+(erc) python -m fire erc.preprocess run_generate_datasets --dataset_name="kemdy19"
+```
+
+#### Create cache file for datasetes
+```zsh
+(erc) python -m fire erc.datasets HF_KEMD
 ```
 
 ### Pre-trained Models
 
 #### `.wav`
 
-[wav2vec](https://huggingface.co/models?sort=downloads&search=wav2vec)
+- [wav2vec](https://huggingface.co/models?sort=downloads&search=wav2vec)
 
 #### `.txt`
 
-[Korean Pre-trained Survey](https://arxiv.org/pdf/2112.03014.pdf)
-[Huggingface Hub](https://huggingface.co/models?language=ko&sort=downloads)
+- [Korean Pre-trained Survey](https://arxiv.org/pdf/2112.03014.pdf)
+- [Huggingface Hub](https://huggingface.co/models?language=ko&sort=downloads)
