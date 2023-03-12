@@ -60,8 +60,8 @@ class WavOnly(ModelBase):
         total_loss = cls_loss * self.cls_coef + reg_loss * self.reg_coef
         return {
             "loss": total_loss,
-            "cls_loss": cls_loss.cpu(),
-            "reg_loss": reg_loss.cpu(),
+            "cls_loss": cls_loss.detach().cpu(),
+            "reg_loss": reg_loss.detach().cpu(),
             "emotion": labels["emotion"].detach(),
             "regress": labels["regress"].detach(),
             "cls_pred": cls_logits.detach(),
