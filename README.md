@@ -22,9 +22,13 @@ Data contains 3 modalities
 Put data and source codes on the same hierarchy. Prevent hard copy and use soft-link: `ln -s ACTUAL_DATA_PATH data`
 
 ### Training
-With default configuration of []
+With default configuration of [./config/train.yaml]
 ```zsh
 python train.py
+```
+Predicting both emotion and regression
+```zsh
+python train.py model=combined
 ```
 
 **Fast Dev**:
