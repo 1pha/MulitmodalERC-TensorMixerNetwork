@@ -9,7 +9,7 @@ defaults:
 dataloader:
   _target_: torch.utils.data.DataLoader
   batch_size: 8
-  num_workers: 1
+  num_workers: 4
   dataset: ${dataset}
 
 optim:
@@ -25,6 +25,7 @@ misc:
 
 module:
   _target_: erc.trainer.ERCModule
+  move_metrics_to_cpu: ${trainer.move_metrics_to_cpu}
 
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
@@ -38,4 +39,7 @@ trainer:
   devices: 1
   accelerator: gpu
   gradient_clip_val: 1
-  move_metrics_to_cpu: True
+  move_metrics_to_cpu: False
+  limit_train_batches: 0.005
+  limit_val_batches: 0.01
+  log_every_n_steps: 2
