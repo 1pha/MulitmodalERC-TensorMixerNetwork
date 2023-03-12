@@ -40,6 +40,6 @@ trainer:
   accelerator: gpu
   gradient_clip_val: 1
   move_metrics_to_cpu: False
-  limit_train_batches: 0.005
-  limit_val_batches: 0.01
-  log_every_n_steps: 2
+  limit_train_batches: 0.5
+  # limit_val_batches: 0.01
+  # log_every_n_steps: 2

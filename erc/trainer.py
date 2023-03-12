@@ -1,4 +1,5 @@
 from typing import List, Dict
+from collections import defaultdict
 
 import hydra
 import omegaconf
@@ -72,6 +73,7 @@ class ERCModule(pl.LightningModule):
             result: dict = self.model(wav=batch["wav"],
                                       wav_mask=batch["wav_mask"],
                                       labels=labels)
+            result["cls_pred"] = result["cls_pred"].argmax(dim=1)
             return result
         except RuntimeError:
             # For CUDA Device-side asserted error
@@ -91,17 +93,6 @@ class ERCModule(pl.LightningModule):
                 # Batched 
                 result[key] = torch.concat([o[key] for o in outputs])
         return result
-
-    def get_trimmed_result(
-        self,
-        result: dict,
-        keys: list = ["loss", "cls_loss", "reg_loss", "cls_pred", "emotion"]
-    ):
-        slim_result = dict()
-        for key in keys:
-            if key in result:
-                slim_result[key] = result[key]
-        return slim_result
     
     def log_result(
         self, 
@@ -109,9 +100,6 @@ class ERCModule(pl.LightningModule):
         mode: erc.constants.RunMode | str = "train",
         unit: str = "epoch"
     ):
-        # if self.move_metrics_to_cpu:
-        #     return self._log_result_fn(outputs=outputs, mode=mode, unit=unit)
-        # else:
         self._log_result(outputs=outputs, mode=mode, unit=unit)
     
     def _log_result(
@@ -121,30 +109,26 @@ class ERCModule(pl.LightningModule):
         unit: str = "epoch"
     ):
         result: dict = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
-        _lk = dict(
-            on_step=(on_step := unit == "step"),
-            on_epoch=(on_epoch := unit == "epoch"),
-        )
+        on_step = unit == "step"
+        on_epoch = unit == "epoch"
         # Log Losses
         for loss_key in ["loss", "cls_loss", "reg_loss"]:
             if loss_key in result:
-                self.log(f"{unit}/{mode}_{loss_key}", torch.mean(result.get(loss_key, 0)), prog_bar=True, **_lk)
+                self.log(f"{unit}/{mode}_{loss_key}", torch.mean(result.get(loss_key, 0)), prog_bar=True)
 
         # Log Classification Metrics: Accuracy & AUROC
-        if "cls_pred" in result and "emotion" in result and on_step:
+        if "cls_pred" in result and "emotion" in result:
             self.acc(preds=result["cls_pred"], target=result["emotion"])
-            self.auroc(preds=result["cls_pred"], target=result["emotion"])
-        self.log(f'{unit}/{mode}_acc', self.acc, **_lk)
-        # self.log(f'{unit}/{mode}_auroc', self.auroc, **_lk)
+        self.log(f'{unit}/{mode}_acc', self.acc)
 
         # Log Regression Metrics: CCC
-        if "reg_pred" in result and "regress" in result and on_step:
+        if "reg_pred" in result and "regress" in result:
             self.ccc_val(result["reg_pred"][:, 0], result["regress"][:, 0])
             self.ccc_aro(result["reg_pred"][:, 1], result["regress"][:, 1])
-        self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val, **_lk)
-        self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro, **_lk)
+        self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val)
+        self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro)
         
-    # def _log_result_fn(
+    # def _log_result_step(
     #     self, 
     #     outputs: List[Dict] | dict, 
     #     mode: erc.constants.RunMode | str = "train",
@@ -152,19 +136,23 @@ class ERCModule(pl.LightningModule):
     # ):
     #     result: dict = self._sort_outputs(outputs=outputs, slim_output=False) if isinstance(outputs, list)\
     #                    else {k: v.to(self.metric_device) for k, v in outputs.items()}
+    #     metrics: dict = defaultdict(list)
     #     # Log Losses
     #     for loss_key in ["loss", "cls_loss", "reg_loss"]:
     #         if loss_key in result:
-    #             self.log(f"{unit}/{mode}_{loss_key}", torch.mean(result.get(loss_key, 0)), prog_bar=True)
+    #             k, v = f"{mode}_{loss_key}", torch.mean(result.get(loss_key, 0))
+    #             self.log(f"step/{k}", v, prog_bar=True)
+    #             metrics[k].append(v)
 
     #     # Log Classification Metrics
     #     if "cls_pred" in result and "emotion" in result:
     #         # Log Accuracy
+    #         k = f"{unit}/{mode}_acc"
     #         acc = tof.accuracy(preds=result["cls_pred"],
     #                            target=result["emotion"],
     #                            task="multiclass",
     #                            num_classes=7)
-    #         self.log(f'{unit}/{mode}_acc', acc, prog_bar=True)
+    #         self.log(f"step/{k}", acc, prog_bar=True)
 
     #         # Log AUROC
     #         if mode == "epoch":
@@ -185,17 +173,16 @@ class ERCModule(pl.LightningModule):
     #     return result
     
     def log_confusion_matrix(self, result: dict):
-        preds = result["cls_pred"].argmax(dim=1).cpu().detach().numpy()
+        preds = result["cls_pred"].cpu().detach().numpy()
         labels = result["emotion"].cpu().numpy()
         cf = wandb.plot.confusion_matrix(y_true=labels,
                                          preds=preds,
                                          class_names=self.label_keys)
         self.logger.experiment.log({"confusion_matrix": cf})
 
-    def training_step(self, batch):
+    def training_step(self, batch, batch_idx):
         result = self.forward(batch)
         self.log_result(outputs=result, mode="train", unit="step")
-        result = self.get_trimmed_result(result)
         return result
 
     def training_epoch_end(self, outputs: List[Dict]):
@@ -206,13 +193,44 @@ class ERCModule(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         result = self.forward(batch)
         self.log_result(outputs=result, mode="valid", unit="step")
-        result = self.get_trimmed_result(result)
         return result
     
     def validation_epoch_end(self, outputs: List[Dict]):
         self.log_result(outputs=outputs, mode="valid", unit="epoch")
         result = self._sort_outputs(outputs=outputs, slim_output=True)
         self.log_confusion_matrix(result)
+
+    # def training_step(self, batch, batch_idx):
+    #     result = self.forward(batch)
+    #     for loss_key in ["loss", "cls_loss", "reg_loss"]:
+    #         if loss_key in result:
+    #             self.log(f"step/train_{loss_key}", torch.mean(result.get(loss_key, 0)), prog_bar=True)
+
+    #     self.acc(preds=result["cls_pred"], target=result["emotion"])
+    #     self.log(f'step/train_acc', self.acc)
+    #     self.auroc(preds=result["cls_pred"], target=result["emotion"])
+    #     self.log(f'step/train_auroc', self.auroc)
+        # self.ccc_val(result["reg_pred"][:, 0], result["regress"][:, 0])
+        # self.ccc_aro(result["reg_pred"][:, 1], result["regress"][:, 1])
+        # self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val)
+        # self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro)
+    #     return result
+
+    # def training_epoch_end(self, outputs: List[Dict]):
+    #     self.log_result(outputs=outputs, mode="train", unit="epoch")
+    #     result = self._sort_outputs(outputs=outputs, slim_output=True)
+    #     self.log_confusion_matrix(result)
+
+    # def validation_step(self, batch, batch_idx):
+    #     result = self.forward(batch)
+    #     self.log_result(outputs=result, mode="valid", unit="step")
+    #     result = self.get_trimmed_result(result)
+    #     return result
+    
+    # def validation_epoch_end(self, outputs: List[Dict]):
+    #     self.log_result(outputs=outputs, mode="valid", unit="epoch")
+    #     result = self._sort_outputs(outputs=outputs, slim_output=True)
+    #     self.log_confusion_matrix(result)
 
 
 def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
