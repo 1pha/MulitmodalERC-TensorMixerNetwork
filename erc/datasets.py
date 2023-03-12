@@ -2,14 +2,15 @@ import os
 from pathlib import Path
 from typing import Tuple
 
+import datasets
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 import torchaudio
-from transformers import AutoTokenizer
+from transformers import AutoProcessor, AutoTokenizer
 
-from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20
+from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20, run_generate_datasets
 from erc.utils import check_exists, get_logger
 from erc.constants import RunMode, emotion2idx, gender2idx
 
@@ -105,10 +106,10 @@ class KEMDBase(Dataset):
                 torch.float32
                 ndim=0
         """
-        data = dict()
         row = self.df.iloc[idx]
         segment_id = row["segment_id"]
-        session, speaker, gender, wav_prefix = self.parse_segment_id(segment_id=segment_id)
+        data = {"segment_id": segment_id}
+        _, _, gender, wav_prefix = self.parse_segment_id(segment_id=segment_id)
         
         wav_path = wav_prefix / f"{segment_id}.wav"
         txt_path = wav_prefix / f"{segment_id}.txt"
@@ -422,6 +423,93 @@ class KEMDDataset(Dataset):
             return self.kemdy19.__getitem__(idx)
         else:
             return self.kemdy20.__getitem__(idx - len(self.kemdy19))
+        
+
+class HF_KEMD:
+    def __init__(
+        self,
+        paths: list | str = ["kemdy19", "kemdy20"],
+        wav_processor: str = "kresnik/wav2vec2-large-xlsr-korean",
+        sampling_rate: int = 16_000,
+        wav_max_length: int = 112_000, # 16_000 * 7, 7secs duration
+        txt_processor: str = "klue/bert-base",
+        txt_max_length: int = 64,
+        cache_file_name: str = "./cache/kemd_cache",
+        load_from_cache_file: bool = True,
+        map_kwargs: dict = {},
+    ):
+        """ Loads dataset and do pre-process
+        Trunctae wav & text to designated maximum length
+        Save to cache directory.
+        Load from cache when cache_file_name is available.
+        This is required since a full run takes around 20 minutes.
+        TODO: Check with DDP / Accelerate
+        """
+        ds: datasets.arrow_dataset.Dataset = self.load_dataset(paths=paths)
+        # Wave Processor
+        self.wav_processor = AutoProcessor.from_pretrained(wav_processor) if wav_processor else None
+        self.wav_kwargs = dict(
+            sampling_rate=sampling_rate,
+            max_length=wav_max_length,
+            truncation="only_first",
+            padding="max_length",
+            padding_value=0,
+            return_attention_mask=True,
+            return_tensors="pt",
+        )
+
+        # Text Tokenizer
+        self.txt_processor = AutoTokenizer.from_pretrained(txt_processor) if txt_processor else None
+        self.txt_kwargs = dict(
+            max_length=txt_max_length,
+            truncation="only_first",
+            padding="max_length",
+            return_attention_mask=True,
+            return_tensors="pt",
+        )
+
+        # Pre-process
+        map_kwargs = dict(
+            batched=True,
+            desc="Pre-process wave & text",
+            load_from_cache_file=load_from_cache_file,
+            cache_file_name=cache_file_name,
+        )
+        self.ds = ds.map(self.preprocess, **map_kwargs).with_format("torch")
+        if cache_file_name:
+            datasets.Dataset.save_to_disk(dataset_path=cache_file_name)
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __getitem__(self, idx: int):
+        return self.ds[idx]
+
+    def preprocess(self, batch: list):
+        """ Mapping function for hf dataset """
+        wav = self.wav_processor(audio=batch["wav"], **self.wav_kwargs)
+        batch["wav"] = wav["input_values"]
+        batch["wav_mask"] = wav["attention_mask"]
+
+        txt = self.txt_processor(text=batch["txt"], **self.txt_kwargs)
+        batch["txt"] = txt["input_ids"]
+        batch["txt_mask"] = txt["attention_mask"]
+        return batch
+        
+    def _load_dataset(self, path: str | Path):
+        """ Loads huggingface dataset saved in .arr(feather) 
+        If dataset does not exists, generate a new dataset. """
+        ds = datasets.load_from_disk(path) if os.path.exists(path)\
+             else run_generate_datasets(dataset_name=path)
+        return ds
+            
+    def load_dataset(self, paths):
+        if isinstance(paths, str | Path):
+            # Single data given
+            ds = self._load_dataset(path=paths)
+        elif isinstance(paths, list):
+            ds = datasets.concatenate_datasets([self._load_dataset(path) for path in paths])
+        return ds
 
 
 if __name__=="__main__":
