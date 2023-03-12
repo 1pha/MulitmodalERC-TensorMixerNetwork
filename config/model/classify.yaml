@@ -1,0 +1,4 @@
+_target_: erc.model.wav.WavCls
+config: kresnik/wav2vec2-large-xlsr-korean
+criterion:
+  _target_: torch.nn.CrossEntropyLoss
