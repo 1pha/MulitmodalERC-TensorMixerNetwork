@@ -13,6 +13,7 @@ dataset:
   max_length_txt: 50
   tokenizer_name: klue/bert-base
   validation_fold: 4
+  num_data: False # To Debug 
 
 dataloader:
   _target_: torch.utils.data.DataLoader
