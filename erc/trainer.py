@@ -1,13 +1,17 @@
 from typing import List, Dict
+from collections import defaultdict
 
-import torch
 import hydra
 import omegaconf
-from torch import nn
 import pytorch_lightning as pl
-from torchmetrics import Accuracy, AUROC
+import torch
+from torch import nn
+import torchmetrics.functional as tof
+from torchmetrics import Accuracy, AUROC, ConcordanceCorrCoef
+import wandb
 
 import erc
+
 
 logger = erc.utils.get_logger()
 
@@ -18,7 +22,8 @@ class ERCModule(pl.LightningModule):
                  optimizer: torch.optim.Optimizer,
                  scheduler: torch.optim.lr_scheduler._LRScheduler,
                  train_loader: torch.utils.data.DataLoader,
-                 valid_loader: torch.utils.data.DataLoader):
+                 valid_loader: torch.utils.data.DataLoader,
+                 ):
         super().__init__()
         self.model = model
         self.optimizer = optimizer
@@ -29,6 +34,11 @@ class ERCModule(pl.LightningModule):
 
         self.acc = Accuracy(task="multiclass", num_classes=7)
         self.auroc = AUROC(task="multiclass", num_classes=7)
+        self.ccc_val = ConcordanceCorrCoef(num_outputs=1)
+        self.ccc_aro = ConcordanceCorrCoef(num_outputs=1)
+
+        self.label_keys = list(erc.constants.emotion2idx.keys())[:-1]
+        self.save_hyperparameters(ignore=["model"])
 
     def train_dataloader(self):
         return self.train_loader
@@ -43,10 +53,15 @@ class ERCModule(pl.LightningModule):
         task = task or self.model.TASK
         if task == erc.constants.Task.CLS:
             # (batch_size,) | Long
-            labels = batch["emotion"].long()
+            labels = batch["label"].long()
         elif task == erc.constants.Task.REG:
             # (batch_size, 2) | Float
-            labels = torch.hstack([batch["valence"], batch["arousal"]]).float()
+            labels = torch.stack([batch["valence"], batch["arousal"]], dim=1).float()
+        elif task == erc.constants.Task.ALL:
+            labels = {
+                "emotion": batch["label"].long(),
+                "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1).float(),
+            }
         return labels
 
     def forward(self, batch):
@@ -74,37 +89,59 @@ class ERCModule(pl.LightningModule):
                 # Batched 
                 result[key] = torch.concat([o[key] for o in outputs])
         return result
-
+    
     def log_result(
         self, 
         outputs: List[Dict] | dict, 
         mode: erc.constants.RunMode | str = "train",
         unit: str = "epoch"
     ):
-        result = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
-        self.log(f"{unit}/{mode}_loss", torch.mean(result.get("loss", 0)))
+        result: dict = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
+        # Log Losses
+        for loss_key in ["loss", "cls_loss", "reg_loss"]:
+            if loss_key in result:
+                self.log(f"{unit}/{mode}_{loss_key}", torch.mean(result.get(loss_key, 0)), prog_bar=True)
 
-        self.acc(result.get("logits", 0), result.get("labels", -1))
+        # Log Classification Metrics: Accuracy & AUROC
+        if "cls_pred" in result and "emotion" in result:
+            self.acc(preds=result["cls_pred"], target=result["emotion"])
+            self.auroc(preds=result["cls_pred"], target=result["emotion"])
         self.log(f'{unit}/{mode}_acc', self.acc)
-
-        self.auroc(result.get("logits", 0), result.get("labels", -1))
         self.log(f'{unit}/{mode}_auroc', self.auroc)
 
-    def training_step(self, batch):
+        # Log Regression Metrics: CCC
+        if "reg_pred" in result and "regress" in result:
+            self.ccc_val(result["reg_pred"][:, 0], result["regress"][:, 0])
+            self.ccc_aro(result["reg_pred"][:, 1], result["regress"][:, 1])
+        self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val)
+        self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro)
+        return result
+        
+    def log_confusion_matrix(self, result: dict):
+        preds = result["cls_pred"].argmax(dim=1).cpu().detach().numpy()
+        labels = result["emotion"].cpu().numpy()
+        cf = wandb.plot.confusion_matrix(y_true=labels,
+                                         preds=preds,
+                                         class_names=self.label_keys)
+        self.logger.experiment.log({"confusion_matrix": cf})
+
+    def training_step(self, batch, batch_idx):
         result = self.forward(batch)
-        self.log_result(outputs=result, mode="train", unit="step")
+        result = self.log_result(outputs=result, mode="train", unit="step")
         return result
 
     def training_epoch_end(self, outputs: List[Dict]):
-        self.log_result(outputs=outputs, mode="train", unit="epoch")
+        result = self.log_result(outputs=outputs, mode="train", unit="epoch")
+        self.log_confusion_matrix(result)
 
-    def validation_step(self, batch):
+    def validation_step(self, batch, batch_idx):
         result = self.forward(batch)
-        self.log_result(outputs=result, mode="valid", unit="step")
+        result = self.log_result(outputs=result, mode="valid", unit="step")
         return result
     
     def validation_epoch_end(self, outputs: List[Dict]):
-        self.log_result(outputs=outputs, mode="valid", unit="epoch")
+        result = self.log_result(outputs=outputs, mode="valid", unit="epoch")
+        self.log_confusion_matrix(result)
 
 
 def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
@@ -130,11 +167,18 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
                                       scheduler=sch,
                                       train_loader=train_loader,
                                       valid_loader=valid_loader)
-    return module
+    return module, train_loader, valid_loader
 
 
 def train(config: omegaconf.DictConfig) -> None:
-    module: pl.LightningModule = setup_trainer(config)
-    logger = hydra.utils.instantiate(config.logger)
+    module, train_loader, valid_loader = setup_trainer(config)
+    logger = hydra.utils.instantiate(
+        config.logger,
+        # config=omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+    )
+    logger.watch(module)
+    wandb.config.update(
+        omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+    )
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer, logger=logger)
-    trainer.fit(model=module)
+    trainer.fit(model=module, train_dataloaders=train_loader, val_dataloaders=valid_loader)

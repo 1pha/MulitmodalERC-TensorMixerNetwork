@@ -1,0 +1,8 @@
+_target_: erc.model.wav.WavOnly
+config: kresnik/wav2vec2-large-xlsr-korean
+criterions:
+  cls:
+    _target_: torch.nn.CrossEntropyLoss
+  reg:
+    _target_: torch.nn.MSELoss
+cls_coef: 0.7

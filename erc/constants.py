@@ -5,6 +5,7 @@ from enum import Enum
 class Task(Enum):
     CLS = "classification"
     REG = "regression"
+    ALL = "classification&regression"
 
 
 class RunMode(Enum):

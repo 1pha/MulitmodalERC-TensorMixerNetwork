@@ -1,7 +1,12 @@
 data/
-wandb/
 outputs/
 lightning_logs/
+kemdy19/
+kemdy20/
+
+# Wandb directoriees
+wandb/
+etri-erc/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
