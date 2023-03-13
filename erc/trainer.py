@@ -7,7 +7,7 @@ import pytorch_lightning as pl
 import torch
 from torch import nn
 import torchmetrics.functional as tof
-from torchmetrics import Accuracy, AUROC, ConcordanceCorrCoef
+from torchmetrics import Accuracy, AUROC, ConcordanceCorrCoef, F1Score
 import wandb
 
 import erc
@@ -34,6 +34,7 @@ class ERCModule(pl.LightningModule):
 
         self.acc = Accuracy(task="multiclass", num_classes=7)
         self.auroc = AUROC(task="multiclass", num_classes=7)
+        self.f1 = F1Score(task="multiclass", num_classes=7)
         self.ccc_val = ConcordanceCorrCoef(num_outputs=1)
         self.ccc_aro = ConcordanceCorrCoef(num_outputs=1)
 
@@ -106,8 +107,10 @@ class ERCModule(pl.LightningModule):
         if "cls_pred" in result and "emotion" in result:
             self.acc(preds=result["cls_pred"], target=result["emotion"])
             self.auroc(preds=result["cls_pred"], target=result["emotion"])
+            self.f1(preds=result["cls_pred"], target=result["emotion"])
         self.log(f'{unit}/{mode}_acc', self.acc)
         self.log(f'{unit}/{mode}_auroc', self.auroc)
+        self.log(f'{unit}/{mode}_f1', self.f1)
 
         # Log Regression Metrics: CCC
         if "reg_pred" in result and "regress" in result:

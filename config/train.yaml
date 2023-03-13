@@ -38,7 +38,7 @@ trainer:
   devices: 1
   accelerator: gpu
   gradient_clip_val: 1
+  log_every_n_steps: 100
   # DEBUGGING FLAGS. TODO: Split
   # limit_train_batches: 0.001
   # limit_val_batches: 0.01
-  # log_every_n_steps: 2
