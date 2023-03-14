@@ -35,6 +35,7 @@ logger:
   entity: etri-erc
   name: ERC-wav
 
+# https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html
 trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 200
@@ -51,8 +52,8 @@ callbacks:
   checkpoint:
     _target_: pytorch_lightning.callbacks.ModelCheckpoint
     dirpath: ${hydra:run.dir}
-    filename: "{epoch}-{step}-valid_loss{epoch/valid_loss:.2f}"
-    monitor: epoch/valid_loss
+    filename: "{step}-valid_loss{epoch/valid_loss:.3f}"
+    monitor: "epoch/valid_loss"
     mode: min
     save_top_k: 3
     save_last: True
@@ -62,6 +63,6 @@ callbacks:
   # https://pytorch-lightning.readthedocs.io/en/stable/common/early_stopping.html
   early_stop:
     _target_: pytorch_lightning.callbacks.early_stopping.EarlyStopping
-    monitor: epoch/valid_loss
+    monitor: "epoch/valid_loss"
     mode: min
     patience: 3
