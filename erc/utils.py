@@ -10,8 +10,7 @@ from torch import nn
 
 
 def get_logger(name: str = None, filehandler: bool = False):
-    if name is None:
-        name = __name__
+    name = name or __name__
     logging.basicConfig()
     logger = logging.getLogger(name=name)
     logger.setLevel(logging.INFO)
