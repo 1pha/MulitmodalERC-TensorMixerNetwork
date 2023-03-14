@@ -12,7 +12,7 @@ import wandb
 import erc
 
 
-logger = erc.utils.get_logger()
+logger = erc.utils.get_logger(name=__name__)
 
 
 class ERCModule(pl.LightningModule):

@@ -16,7 +16,7 @@ from erc.utils import check_exists, get_logger
 from erc.constants import RunMode, emotion2idx, gender2idx
 
 
-logger = get_logger()
+logger = get_logger(name=__name__)
 
 
 class KEMDBase(Dataset):

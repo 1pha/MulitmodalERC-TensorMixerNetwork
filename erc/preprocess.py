@@ -14,7 +14,7 @@ from erc.utils import get_logger
 from erc.constants import columns_kemdy19, columns_kemdy20
 
 
-logger = get_logger()
+logger = get_logger(name=__name__)
 
 
 def get_folds(num_session: int = 20, num_folds = 5) -> dict:
