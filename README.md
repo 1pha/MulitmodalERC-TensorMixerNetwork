@@ -19,7 +19,8 @@ Data contains 3 modalities
 (erc) ./setup.sh
 ```
 
-Put data and source codes on the same hierarchy. Prevent hard copy and use soft-link: `ln -s ACTUAL_DATA_PATH data`
+- Put data and source codes on the same hierarchy. Prevent hard copy and use soft-link: `ln -s ACTUAL_DATA_PATH data`
+- It is good to
 
 ### Training
 With default configuration of [./config/train.yaml]
@@ -35,6 +36,10 @@ python train.py model=combined
 Cases where cpu is not available, debugging required. Below command reduces number of dataset being forwarded.
 ```zsh
 python train.py dataset.num_data=4 dataloader.batch_size=4 trainer.accelerator=cpu
+```
+or use `lightning`s' `fast_dev_run` flag. (_Runs n if set to n (int) else 1 if set to True batch(es) of train, val and test to find any bugs (ie: a sort of unit test). Default: False._)
+```zsh
+python train.py +trainer.fast_dev_run=True
 ```
 
 ### Testing Functions

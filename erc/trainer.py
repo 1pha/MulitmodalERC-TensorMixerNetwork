@@ -35,7 +35,7 @@ class ERCModule(pl.LightningModule):
 
         self.acc = Accuracy(task="multiclass", num_classes=7)
         self.auroc = AUROC(task="multiclass", num_classes=7)
-        self.f1 = F1Score(task="multiclass", num_classes=7)
+        self.f1 = F1Score(task="multiclass", num_classes=7, average="macro")
         self.ccc_val = ConcordanceCorrCoef(num_outputs=1)
         self.ccc_aro = ConcordanceCorrCoef(num_outputs=1)
 
