@@ -8,6 +8,7 @@ defaults:
   - _self_
   - dataset: hf
   - model: combined
+  - scheduler: cosine_warmup
 
 dataloader:
   _target_: torch.utils.data.DataLoader
@@ -21,22 +22,6 @@ optim:
   lr: 1e-5
   weight_decay: 1e-6
 
-# Not in hydra style, but rather use `configure_optimizers` style
-# https://lightning.ai/docs/pytorch/latest/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers
-# 
-sch:
-  _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
-  T_0: 500
-  T_mult: 2
-  eta_min: 1e-7
-
-# sch_config:
-#   interval: step
-#   monitor:
-#   frequency:
-#   strict: False
-#   name: learning rate
-
 misc:
   seed: 42
   debug: False
@@ -44,6 +29,7 @@ misc:
 
 module:
   _target_: erc.trainer.ERCModule
+  _recursive_: False
 
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
