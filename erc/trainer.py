@@ -1,5 +1,5 @@
+import os
 from typing import List, Dict
-from collections import defaultdict
 
 import hydra
 import omegaconf
@@ -23,6 +23,7 @@ class ERCModule(pl.LightningModule):
                  scheduler: torch.optim.lr_scheduler._LRScheduler,
                  train_loader: torch.utils.data.DataLoader,
                  valid_loader: torch.utils.data.DataLoader,
+                 load_from_checkpoint: str = None,
                  ):
         super().__init__()
         self.model = model
@@ -39,6 +40,9 @@ class ERCModule(pl.LightningModule):
         self.ccc_aro = ConcordanceCorrCoef(num_outputs=1)
 
         self.label_keys = list(erc.constants.emotion2idx.keys())[:-1]
+        if load_from_checkpoint:
+            logger.info("Load checkpoint from %s", load_from_checkpoint)
+            self.load_from_checkpoint(load_from_checkpoint)
         self.save_hyperparameters(ignore=["model"])
 
     def train_dataloader(self):
@@ -175,13 +179,18 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
 
 def train(config: omegaconf.DictConfig) -> None:
     module, train_loader, valid_loader = setup_trainer(config)
-    logger = hydra.utils.instantiate(
-        config.logger,
-        # config=omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
-    )
+    
+    # Logger Setup
+    logger = hydra.utils.instantiate(config.logger)
     logger.watch(module)
+    # Hard-code config uploading
     wandb.config.update(
         omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     )
-    trainer: pl.Trainer = hydra.utils.instantiate(config.trainer, logger=logger)
+
+    # Callbacks
+    callbacks: dict = hydra.utils.instantiate(config.callbacks)
+    trainer: pl.Trainer = hydra.utils.instantiate(config.trainer,
+                                                  logger=logger,
+                                                  callbacks=list(callbacks.values()))
     trainer.fit(model=module, train_dataloaders=train_loader, val_dataloaders=valid_loader)
