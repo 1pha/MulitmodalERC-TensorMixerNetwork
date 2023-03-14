@@ -1,5 +1,4 @@
-import os
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import hydra
 import omegaconf
@@ -19,20 +18,24 @@ logger = erc.utils.get_logger()
 class ERCModule(pl.LightningModule):
     def __init__(self,
                  model: nn.Module,
-                 optimizer: torch.optim.Optimizer,
-                 scheduler: torch.optim.lr_scheduler._LRScheduler,
                  train_loader: torch.utils.data.DataLoader,
                  valid_loader: torch.utils.data.DataLoader,
+                 optimizer: torch.optim.Optimizer,
+                 scheduler: dict = None,
                  load_from_checkpoint: str = None,
                  ):
         super().__init__()
         self.model = model
-        self.optimizer = optimizer
-        self.scheduler = scheduler
 
+        # Dataloaders
         self.train_loader = train_loader
         self.valid_loader = valid_loader
 
+        # Optimizations
+        self.opt = optimizer
+        self.scheduler: dict = scheduler
+
+        # Metrics Configuration
         self.acc = Accuracy(task="multiclass", num_classes=7)
         self.auroc = AUROC(task="multiclass", num_classes=7)
         self.f1 = F1Score(task="multiclass", num_classes=7, average="macro")
@@ -43,6 +46,7 @@ class ERCModule(pl.LightningModule):
         if load_from_checkpoint:
             logger.info("Load checkpoint from %s", load_from_checkpoint)
             self.load_from_checkpoint(load_from_checkpoint)
+        # TODO: Look-up what to save
         self.save_hyperparameters(ignore=["model"])
 
     def train_dataloader(self):
@@ -51,8 +55,14 @@ class ERCModule(pl.LightningModule):
     def valid_dataloader(self):
         return self.valid_loader
     
-    def configure_optimizers(self) -> torch.optim.Optimizer:
-        return self.optimizer
+    def configure_optimizers(self) -> torch.optim.Optimizer | dict:
+        if self.scheduler is not None:
+            return {
+                "optimizer": self.opt,
+                "lr_scheduler": self.scheduler
+            }
+        else:
+            return self.opt
 
     def get_label(self, batch: dict, task: erc.constants.Task = None):
         task = task or self.model.TASK
@@ -158,8 +168,10 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     logger.info("Start intantiating Models & Optimizers")
     model = hydra.utils.instantiate(config.model)
     optim = hydra.utils.instantiate(config.optim, params=model.parameters())
-    sch = hydra.utils.instantiate(config.sch, optimizer=optim) \
-        if config.get("sch", None) else None
+    sch = dict(
+        scheduler=hydra.utils.instantiate(config.sch, optimizer=optim),
+        **config.sch_config
+    ) if ("sch" in config) and ("sch_config" in config) else None
 
     logger.info("Start instantiating dataloaders")
     train_dataset = hydra.utils.instantiate(config.dataset, mode="train")
