@@ -2,7 +2,7 @@
 
 [Competition Links](https://aifactory.space/competition/detail/2234)
 
-## Data
+## 1. Data
 
 ### About Data
 Data contains 3 modalities
@@ -10,7 +10,7 @@ Data contains 3 modalities
 - `.txt`: Script of an audio
 - `.csv`: Electrocardiogram & Electrodermal activity data
 
-## Code
+## 2. Code
 ### Basic Setups
 ```zsh
 (base) conda create -n erc python=3.10
@@ -23,13 +23,20 @@ Data contains 3 modalities
 - It is good to
 
 ### Training
+Since creating a new dataset requires computational burden & `num_proc > 1` for multiprocessing datasets gets deadlocked, one first needs to **explicitly create a dataset with following commands**
+```zsh
+python -m fire erc.datasets HF_KEMD --mode=train --validation_fold=${valfold}
+python -m fire erc.datasets HF_KEMD --mode=valid --validation_fold=${valfold}
+```
 With default configuration of [./config/train.yaml]
 ```zsh
 python train.py
 ```
-Predicting both emotion and regression
+
+Note that above processes in a single shell script are written in [train.sh](./train.sh). However, modifying configurations through CLI is not possible but default configurations saved in [config](./config) directory is only available.
 ```zsh
-python train.py model=combined
+(erc) chmod +x train.sh
+(erc) ./train.sh
 ```
 
 **Fast Dev**:
@@ -61,6 +68,7 @@ For example, if one needs to test [`preprocess.make_total_df`](erc/preprocess.py
 (erc) python -m fire erc.datasets HF_KEMD
 ```
 
+## 3. Reference
 ### Pre-trained Models
 
 #### `.wav`
