@@ -85,6 +85,8 @@ class ERCModule(pl.LightningModule):
             labels = self.get_label(batch)
             result: dict = self.model(wav=batch["wav"],
                                       wav_mask=batch["wav_mask"],
+                                      txt=batch["txt"],
+                                      txt_mask=batch["txt_mask"],
                                       labels=labels)
             return result
         except RuntimeError:

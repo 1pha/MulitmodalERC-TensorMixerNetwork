@@ -47,7 +47,7 @@ class WavOnly(ModelBase):
         self.cls_coef = cls_coef
         self.reg_coef = 1 - cls_coef
 
-    def forward(self, wav: torch.Tensor, wav_mask: torch.Tensor, labels: torch.Tensor = None):
+    def forward(self, wav: torch.Tensor, wav_mask: torch.Tensor, labels: torch.Tensor = None, **kwargs):
         # We retrieve logits directly in order to avoid last_hidden_state memory allocation issue
         logits = self.model(input_values=wav, attention_mask=wav_mask).logits
 
