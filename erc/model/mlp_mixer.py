@@ -94,7 +94,7 @@ class MLP_Mixer(nn.Module):
         pooled_txt_output = txt_outputs[1] # (B, BERT_hidden_dim)
 
         # (B, 1 , proj_size, BERT_hidden_dim)
-        matmul_output = torch.bmm(pooled_wav_output.unsqueeze_(2), pooled_txt_output.unsqueeze_(1)).unsqueeze_(1)
+        matmul_output = torch.bmm(pooled_wav_output.unsqueeze(2), pooled_txt_output.unsqueeze(1)).unsqueeze(1)
         logits = self.mlp_mixer(matmul_output) # (B, num_labels)
 
         # calcuate the loss fct
