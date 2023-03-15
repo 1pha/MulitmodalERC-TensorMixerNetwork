@@ -59,9 +59,10 @@ class MLP_Mixer(nn.Module):
         super().__init__()
         self.wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav']).wav2vec2
         self.txt_model = BertForSequenceClassification.from_pretrained(config['txt']).bert
-        self.mlp_mixer = MLPMixer(image_size=(self.wav_model.config.classifier_proj_size, 768),
+        self.mlp_mixer = MLPMixer(image_size=self.wav_model.config.classifier_proj_size,
                                   **config['mlp_mixer'])
-        self.projector = nn.Linear(self.wav_model.config.hidden_size,self.wav_model.config.classifier_proj_size)
+        self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, self.wav_model.config.classifier_proj_size)
+        self.txt_projector = nn.Linear(768, self.wav_model.config.classifier_proj_size)
 
         self.criterions = criterions
         if not (0 < cls_coef < 1):
@@ -77,10 +78,15 @@ class MLP_Mixer(nn.Module):
         txt_mask: torch.Tensor,
         labels: torch.Tensor = None,
         **kwargs) -> dict:
-        """ Please return as dictionary """
+        """ Size
+         WAV_hidden_dim: 1024
+         WAV_proj_size: 256
+         BERT_hidden_dim: 768
+         BERT_proj_size: 256
+           """
         # WAV 
         wav_outputs = self.wav_model(input_values=wav, attention_mask=wav_mask) # (B, S, WAV_hidden_dim)
-        hidden_states = self.projector(wav_outputs[0]) # (B, S, proj_size)
+        hidden_states = self.wav_projector(wav_outputs[0]) # (B, S, WAV_proj_size) 
         # Pool hidden states. (B, proj_size)
         if wav_mask is None:
             pooled_wav_output = hidden_states.mean(dim=1)
@@ -90,10 +96,10 @@ class MLP_Mixer(nn.Module):
             pooled_wav_output = hidden_states.sum(dim=1) / padding_mask.sum(dim=1).view(-1, 1)
 
         # TXT 
-        txt_outputs = self.txt_model(input_ids=txt, attention_mask=txt_mask)
-        pooled_txt_output = txt_outputs[1] # (B, BERT_hidden_dim)
+        txt_outputs = self.txt_model(input_ids=txt, attention_mask=txt_mask)[1] # (B, BERT_hidden_dim)
+        pooled_txt_output = self.txt_projector(txt_outputs) # (B, BERT_proj_size)
 
-        # (B, 1 , proj_size, BERT_hidden_dim)
+        # (B, 1 , WAV_proj_size, BERT_proj_size)
         matmul_output = torch.bmm(pooled_wav_output.unsqueeze(2), pooled_txt_output.unsqueeze(1)).unsqueeze(1)
         logits = self.mlp_mixer(matmul_output) # (B, num_labels)
 
