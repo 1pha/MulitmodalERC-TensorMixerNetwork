@@ -120,5 +120,3 @@ class MLP_Mixer(nn.Module):
             "cls_pred": cls_logits.detach(),
             "reg_pred": reg_logits.detach(),
         }
-        return pred
-    
