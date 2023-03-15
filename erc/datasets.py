@@ -495,7 +495,7 @@ class HF_KEMD:
                 self.num_data = round(0.05 * len(self.ds))
         else:
             self.num_data = None
-        logger.info("# %s Data: %s", mode.capitalize(), len(self))
+        logger.info("# %s Data: %s", mode, len(self))
 
     def __len__(self):
         return len(self.ds) if not self.num_data else len(self.ds[:self.num_data])
