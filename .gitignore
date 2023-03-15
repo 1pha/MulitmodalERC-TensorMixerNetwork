@@ -140,3 +140,4 @@ dmypy.json
 
 # audio_dataset
 audio_dataset_19/
+wav2vec2-xlsr-speech-emotion-classification/

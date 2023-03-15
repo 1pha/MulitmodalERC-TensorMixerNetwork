@@ -1,10 +1,10 @@
 """ Base for training
 """
-from torch import nn
+import torch
+from transformers import Wav2Vec2ForSequenceClassification, BertForSequenceClassification
 
-class ModelBase(nn.Module):
+from erc.constants import Task
+
+class ModelBase:
     def __init__(self,):
-        super().__init__()
-
-    def forward(self, **kwargs) -> dict:
-        """ Please return as dictionary """
+        pass

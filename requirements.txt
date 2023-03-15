@@ -18,3 +18,4 @@ jiwer
 datasets
 accelerate
 wandb
+einops
