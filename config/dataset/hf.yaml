@@ -1,5 +1,5 @@
 _target_: erc.datasets.HF_KEMD
-paths: [ kemdy19, kemdy20 ]
+paths: kemdy19-kemdy20
 validation_fold: 4
 wav_processor: kresnik/wav2vec2-large-xlsr-korean
 sampling_rate: 16_000
@@ -8,4 +8,8 @@ txt_processor: klue/bert-base
 txt_max_length: 64
 load_from_cache_file: True
 num_proc: 8
+batched: True
+batch_size: 1000
+writer_batch_size: 1000
 num_data: False
+preprocess: True

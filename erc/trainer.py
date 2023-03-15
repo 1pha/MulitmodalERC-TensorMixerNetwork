@@ -1,5 +1,4 @@
-from typing import List, Dict
-from collections import defaultdict
+from typing import List, Dict, Tuple
 
 import hydra
 import omegaconf
@@ -13,32 +12,41 @@ import wandb
 import erc
 
 
-logger = erc.utils.get_logger()
+logger = erc.utils.get_logger(name=__name__)
 
 
 class ERCModule(pl.LightningModule):
     def __init__(self,
                  model: nn.Module,
-                 optimizer: torch.optim.Optimizer,
-                 scheduler: torch.optim.lr_scheduler._LRScheduler,
                  train_loader: torch.utils.data.DataLoader,
                  valid_loader: torch.utils.data.DataLoader,
+                 optimizer: torch.optim.Optimizer,
+                 scheduler: dict = None,
+                 load_from_checkpoint: str = None,
                  ):
         super().__init__()
         self.model = model
-        self.optimizer = optimizer
-        self.scheduler = scheduler
 
+        # Dataloaders
         self.train_loader = train_loader
         self.valid_loader = valid_loader
 
+        # Optimizations
+        self.opt = optimizer
+        self.sch: dict = scheduler
+
+        # Metrics Configuration
         self.acc = Accuracy(task="multiclass", num_classes=7)
         self.auroc = AUROC(task="multiclass", num_classes=7)
-        self.f1 = F1Score(task="multiclass", num_classes=7)
+        self.f1 = F1Score(task="multiclass", num_classes=7, average="macro")
         self.ccc_val = ConcordanceCorrCoef(num_outputs=1)
         self.ccc_aro = ConcordanceCorrCoef(num_outputs=1)
 
         self.label_keys = list(erc.constants.emotion2idx.keys())[:-1]
+        if load_from_checkpoint:
+            logger.info("Load checkpoint from %s", load_from_checkpoint)
+            self.load_from_checkpoint(load_from_checkpoint)
+        # TODO: Look-up what to save
         self.save_hyperparameters(ignore=["model"])
 
     def train_dataloader(self):
@@ -47,22 +55,29 @@ class ERCModule(pl.LightningModule):
     def valid_dataloader(self):
         return self.valid_loader
     
-    def configure_optimizers(self) -> torch.optim.Optimizer:
-        return self.optimizer
+    def configure_optimizers(self) -> torch.optim.Optimizer | dict:
+        if self.sch is not None:
+            return {
+                "optimizer": self.opt,
+                "lr_scheduler": dict(**self.sch)
+            }
+        else:
+            return self.opt
 
     def get_label(self, batch: dict, task: erc.constants.Task = None):
         task = task or self.model.TASK
         if task == erc.constants.Task.CLS:
             # (batch_size,) | Long
-            labels = batch["label"].long()
+            labels = batch["emotion"].long()
         elif task == erc.constants.Task.REG:
             # (batch_size, 2) | Float
             labels = torch.stack([batch["valence"], batch["arousal"]], dim=1).float()
         elif task == erc.constants.Task.ALL:
             labels = {
-                "emotion": batch["label"].long(),
+                "emotion": batch["emotion"].long(),
                 "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1).float(),
             }
+        # TODO: Add Multilabel Fetch
         return labels
 
     def forward(self, batch):
@@ -154,34 +169,44 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     logger.info("Start intantiating Models & Optimizers")
     model = hydra.utils.instantiate(config.model)
     optim = hydra.utils.instantiate(config.optim, params=model.parameters())
-    sch = hydra.utils.instantiate(config.sch, optimizer=optim) \
-        if config.get("sch", None) else None
+    sch = hydra.utils.instantiate(config.scheduler, scheduler={"optimizer": optim})\
+          if config.get("scheduler", None) else None
 
     logger.info("Start instantiating dataloaders")
-    train_dataset = hydra.utils.instantiate(config.dataset, mode="train")
-    train_loader = hydra.utils.instantiate(config.dataloader, dataset=train_dataset)
-    valid_dataset = hydra.utils.instantiate(config.dataset, mode="valid")
-    valid_loader = hydra.utils.instantiate(config.dataloader, dataset=valid_dataset)
+    # train_dataset = hydra.utils.instantiate(config.dataset, mode="train")
+    # train_loader = hydra.utils.instantiate(config.dataloader, dataset=train_dataset)
+    # valid_dataset = hydra.utils.instantiate(config.dataset, mode="valid")
+    # valid_loader = hydra.utils.instantiate(config.dataloader, dataset=valid_dataset)
+    dataloaders = erc.datasets.get_dataloaders(ds_cfg=config.dataset,
+                             dl_cfg=config.dataloader,
+                             modes=config.misc.modes)
     
     logger.info("Start instantiating Pytorch-Lightning Trainer")
     module = hydra.utils.instantiate(config.module,
                                       model=model,
                                       optimizer=optim,
                                       scheduler=sch,
-                                      train_loader=train_loader,
-                                      valid_loader=valid_loader)
-    return module, train_loader, valid_loader
+                                      train_loader=dataloaders["train"],
+                                      valid_loader=dataloaders["valid"])
+    return module, dataloaders
 
 
 def train(config: omegaconf.DictConfig) -> None:
-    module, train_loader, valid_loader = setup_trainer(config)
-    logger = hydra.utils.instantiate(
-        config.logger,
-        # config=omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
-    )
+    module, dataloaders = setup_trainer(config)
+    
+    # Logger Setup
+    logger = hydra.utils.instantiate(config.logger)
     logger.watch(module)
+    # Hard-code config uploading
     wandb.config.update(
         omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     )
-    trainer: pl.Trainer = hydra.utils.instantiate(config.trainer, logger=logger)
-    trainer.fit(model=module, train_dataloaders=train_loader, val_dataloaders=valid_loader)
+
+    # Callbacks
+    callbacks: dict = hydra.utils.instantiate(config.callbacks)
+    trainer: pl.Trainer = hydra.utils.instantiate(config.trainer,
+                                                  logger=logger,
+                                                  callbacks=list(callbacks.values()))
+    trainer.fit(model=module,
+                train_dataloaders=dataloaders["train"],
+                val_dataloaders=dataloaders["valid"])

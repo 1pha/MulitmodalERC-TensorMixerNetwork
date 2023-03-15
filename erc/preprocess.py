@@ -11,10 +11,10 @@ from datasets import Dataset, load_from_disk
 
 import erc
 from erc.utils import get_logger
-from erc.constants import columns_kemdy19, columns_kemdy20
+from erc.constants import columns_kemdy19, columns_kemdy20, emotion2idx, idx2emotion
 
 
-logger = get_logger()
+logger = get_logger(name=__name__)
 
 
 def get_folds(num_session: int = 20, num_folds = 5) -> dict:
@@ -48,6 +48,10 @@ def eda_preprocess(file_path: str) -> pd.DataFrame:
     return pd.DataFrame(new_lines, columns=columns).replace("None", np.nan).dropna()
 
 
+def map_emotion(arr):
+    return np.vectorize(erc.constants.emotion2idx.get)(arr)
+
+
 def merge_csv_kemdy19(
     base_path: str | Path = "./data/KEMDy19",
     save_path: str | Path = "./data/kemdy19.csv",
@@ -74,9 +78,23 @@ def merge_csv_kemdy19(
         desc=f"Processing ECG / EDA / Label from {base_path}",
         total=min(len(male_annots), len(female_annots))
     )
+    emo_keys = list(emotion2idx.keys())
+    emo_keys.remove("disqust")
     for m_ann, f_ann in pbar:
-        m_df = pd.read_csv(m_ann).dropna()[list(columns_kemdy19.keys())]
-        f_df = pd.read_csv(f_ann).dropna()[list(columns_kemdy19.keys())]
+        m_df = pd.read_csv(m_ann).dropna()
+        f_df = pd.read_csv(f_ann).dropna()
+        col_filter = list(columns_kemdy19.keys())
+        if not exclude_multilabel:
+            m_emo, f_emo = m_df.iloc[:, -30::3], f_df.iloc[:, -30::3]
+            for emo, idx in emotion2idx.items():
+                if emo == "disqust":
+                    emo = "disgust"
+                m_df[emo] = (map_emotion(m_emo) == idx).sum(axis=1)
+                f_df[emo] = (map_emotion(f_emo) == idx).sum(axis=1)
+            col_filter += emo_keys
+            assert len(col_filter) == 20, f"# cols should be 20: existing 13 + 7 emotions"
+        m_df = m_df[col_filter]
+        f_df = f_df[col_filter]
 
         # Sess01_impro03, Sess01_impro04의 TEMP와 E4-EDA값이 결측
         # 다른 Session에서도 결측값은 있으나, 해당 두 세션에는 결측값이 너무 많아 유효한 데이터가 아니라고 판단하여
@@ -92,14 +110,19 @@ def merge_csv_kemdy19(
         # 다시 합쳐서 정렬
         tmp_df = pd.concat([m_df, f_df], axis=0).sort_values("Numb")
         total_df = pd.concat([total_df, tmp_df], axis=0)
-
     
-    logger.info(f"New dataframe saved as {save_path}")
-    total_df.columns = list(columns_kemdy19.values())
+    total_df.columns = list(columns_kemdy19.values()) + (emo_keys if not exclude_multilabel else [])
     if exclude_multilabel:
         total_df = total_df[~total_df['emotion'].str.contains(';')]
+    else:
+        # Check missing emotion
+        assert (total_df.iloc[:, -7:].sum(axis=1) == 10).sum() == total_df.shape[0],\
+            f"Make sure there is no mislabeled emotion{total_df}"
+
     if save_path:
         total_df.to_csv(save_path, index=False)
+        logger.info(f"New dataframe saved as {save_path}")
+        logger.info(f"Created dataframe has shape of {total_df.shape}")
     return total_df
 
 
@@ -127,16 +150,33 @@ def merge_csv_kemdy20(
         desc=f"Processing {base_path}",
         total=len(annots)
     )
+    emo_keys = list(emotion2idx.keys())
+    emo_keys.remove("disqust")
+    col_filter = list(columns_kemdy20.keys())
     for ann in pbar:
-        df = pd.read_csv(ann).dropna().iloc[1:, list(columns_kemdy20.keys())]
+        df = pd.read_csv(ann).dropna().iloc[1:]
+        if not exclude_multilabel:
+            emo_df = df.iloc[:, -30::3]
+            for emo, idx in emotion2idx.items():
+                if emo == "disqust":
+                    emo = "disgust"
+                df[emo] = (map_emotion(emo_df) == idx).sum(axis=1)
+            df = pd.concat([df.iloc[:, col_filter], df.iloc[:, -7:]], axis=1)
+        else:
+            df = df.iloc[:, col_filter]
         total_df = pd.concat([total_df, df], axis=0).sort_values("Numb")
-    
-    logger.info(f"New dataframe saved as {save_path}")
-    total_df.columns = list(columns_kemdy20.values())
+
+    total_df.columns = list(columns_kemdy20.values()) + (emo_keys if not exclude_multilabel else [])
     if exclude_multilabel:
         total_df = total_df[~total_df['emotion'].str.contains(';')]
+    else:
+        # Check missing emotion
+        assert (total_df.iloc[:, -7:].sum(axis=1) == 10).sum() == total_df.shape[0],\
+            f"Make sure there is no mislabeled emotion{total_df}"
     if save_path:
         total_df.to_csv(save_path, index=False)
+        logger.info(f"New dataframe saved as {save_path}")
+        logger.info(f"Created dataframe has shape of {total_df.shape}")
     return total_df
 
 
