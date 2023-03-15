@@ -9,9 +9,10 @@ import torch
 from torch import nn
 
 
-def get_logger(filehandler: bool = False):
+def get_logger(name: str = None, filehandler: bool = False):
+    name = name or __name__
     logging.basicConfig()
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger(name=name)
     logger.setLevel(logging.INFO)
     if filehandler:
         fname = f"{time.strftime('%Y%m%d-%H%M', time.localtime())}.log"

@@ -3,7 +3,9 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Tuple
 
+import hydra
 import datasets
+import omegaconf
 import numpy as np
 import pandas as pd
 import torch
@@ -16,7 +18,7 @@ from erc.utils import check_exists, get_logger
 from erc.constants import RunMode, emotion2idx, gender2idx
 
 
-logger = get_logger()
+logger = get_logger(name=__name__)
 
 
 class KEMDBase(Dataset):
@@ -30,6 +32,7 @@ class KEMDBase(Dataset):
         max_length_wav: int = 200_000,
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
+        multilabel: bool = False,
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
@@ -63,6 +66,10 @@ class KEMDBase(Dataset):
         self.max_length_wav = max_length_wav
         self.max_length_txt = max_length_txt
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name) if tokenizer_name else None
+        self.multilabel = multilabel
+        emo_col = list(emotion2idx.keys())
+        emo_col.remove("disqust")
+        self.emo_col = emo_col if multilabel else "emotion"
         # This assertion is subject to change: number of folds to split
         assert isinstance(validation_fold, int) and validation_fold in range(-1, 5),\
             f"Validation fold should lie between 0 - 4, int. Given: {validation_fold}"
@@ -139,7 +146,7 @@ class KEMDBase(Dataset):
                 data[bio] = torch.tensor((s + e) / 2, dtype=torch.float)
                 
         # Emotion
-        data["emotion"] = self.str2num(row["emotion"])
+        data["emotion"] = self.get_emo(row[self.emo_col])
 
         # Valence & Arousal
         valence, arousal = map(float, row[["valence", "arousal"]])
@@ -221,6 +228,17 @@ class KEMDBase(Dataset):
         else:
             try:
                 total_df = pd.read_csv(self.TOTAL_DF_PATH)
+                if self.multilabel:
+                    if not set(self.emo_col) & set(total_df.columns):
+                        total_df = self.merge_csv(base_path=self.base_path,
+                                                  save_path=self.TOTAL_DF_PATH,
+                                                  exclude_multilabel=False)
+                else:
+                    if total_df[self.emo_col].apply(lambda s: ";" in s).sum():
+                        # Multilabel should NOT be contained
+                        total_df = self.merge_csv(base_path=self.base_path,
+                                                  save_path=self.TOTAL_DF_PATH,
+                                                  exclude_multilabel=True)
             except pd.errors.EmptyDataError as e:
                 logger.error(f"{self.TOTAL_DF_PATH} seems to be empty")
                 logger.exception(e)
@@ -244,6 +262,19 @@ class KEMDBase(Dataset):
             fold_range: range = fold_dict[fold_num]
             loc = ~sessions.isin(fold_range) if mode == RunMode.TRAIN else sessions.isin(fold_range)
             return total_df.loc[loc]
+        
+    def get_emo(self, emotion: str | pd.Series) -> str | np.ndarray:
+        if isinstance(emotion, str):
+            # Single label cases
+            return self.str2num(emotion)
+        else:
+            # Multilabel label cases
+            return self.vectorize(emotion)
+
+    def vectorize(self, emotion: pd.Series) -> np.ndarray:
+        ev = emotion.values
+        ev = ev / ev.sum()
+        return ev
     
     def str2num(self, key: str) -> torch.Tensor:
         emotion = emotion2idx.get(key, -1)
@@ -262,6 +293,7 @@ class KEMDBase(Dataset):
         self,
         base_path: str | Path = "./data/KEMDy20_v1_1",
         save_path: str | Path = "./data/kemdy20.csv",
+        exclude_multilabel: bool = True,
     ):
         """ Loads all annotation .csv and merge into a single csv.
         This function is called when target .csv is not found. """
@@ -284,7 +316,8 @@ class KEMDy19Dataset(KEMDBase):
         return_bio: bool = True,
         max_length_wav: int = 200_000,
         max_length_txt: int = 50,
-        tokenizer_name: str = "klue/bert-base",
+        tokenizer_name: str = None,
+        multilabel: bool = False,
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
@@ -296,6 +329,7 @@ class KEMDy19Dataset(KEMDBase):
             max_length_wav,
             max_length_txt,
             tokenizer_name,
+            multilabel,
             validation_fold,
             mode,
             num_data,
@@ -305,8 +339,11 @@ class KEMDy19Dataset(KEMDBase):
         self,
         base_path: str | Path = "./data/KEMDy19",
         save_path: str | Path = "./data/kemdy19.csv",
+        exclude_multilabel: bool = True,
     ):
-        return merge_csv_kemdy19(base_path=base_path, save_path=save_path)
+        return merge_csv_kemdy19(base_path=base_path,
+                                 save_path=save_path,
+                                 exclude_multilabel=exclude_multilabel)
 
     def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:
         """ KEMDy19
@@ -336,7 +373,8 @@ class KEMDy20Dataset(KEMDBase):
         return_bio: bool = False,
         max_length_wav: int = 200_000,
         max_length_txt: int = 50,
-        tokenizer_name: str = "klue/bert-base",
+        tokenizer_name: str = None,
+        multilabel: bool = False,
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
@@ -348,6 +386,7 @@ class KEMDy20Dataset(KEMDBase):
             max_length_wav,
             max_length_txt,
             tokenizer_name,
+            multilabel,
             validation_fold,
             mode,
             num_data,
@@ -357,8 +396,11 @@ class KEMDy20Dataset(KEMDBase):
         self,
         base_path: str | Path = "./data/KEMDy20_v1_1",
         save_path: str | Path = "./data/kemdy20.csv",
+        exclude_multilabel: bool = True,
     ):
-        return merge_csv_kemdy20(base_path=base_path, save_path=save_path)
+        return merge_csv_kemdy20(base_path=base_path,
+                                 save_path=save_path,
+                                 exclude_multilabel=exclude_multilabel)
 
     def parse_segment_id(self, segment_id: str) -> Tuple[str, str, str, str]:
         """
@@ -389,6 +431,7 @@ class KEMDDataset(Dataset):
     dataloader = hydra.utils.instantiate(cfg.dataloader)
     batch = next(iter(dataloader))
     ```
+    # TODO: Use `torch.utils.data.ConcatDataset`
     """
     def __init__(
         self,
@@ -397,6 +440,7 @@ class KEMDDataset(Dataset):
         max_length_wav: int = 80_000,
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
+        multilabel: bool = False,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
     ):
@@ -405,6 +449,7 @@ class KEMDDataset(Dataset):
                                       max_length_wav=max_length_wav,
                                       max_length_txt=max_length_txt,
                                       tokenizer_name=tokenizer_name,
+                                      multilabel=multilabel,
                                       validation_fold=validation_fold,
                                       mode=mode,
                                       num_data=num_data)
@@ -412,6 +457,7 @@ class KEMDDataset(Dataset):
                                       max_length_wav=max_length_wav,
                                       max_length_txt=max_length_txt,
                                       tokenizer_name=tokenizer_name,
+                                      multilabel=multilabel,
                                       validation_fold=validation_fold,
                                       mode=mode,
                                       num_data=num_data)
@@ -425,21 +471,26 @@ class KEMDDataset(Dataset):
         else:
             return self.kemdy20.__getitem__(idx - len(self.kemdy19))
         
-
 class HF_KEMD:
     def __init__(
         self,
-        paths: list | str = ["kemdy19", "kemdy20"],
+        paths: str = "kemdy19-kemdy20",
         validation_fold: int = 4,
+        save_to_disk: bool = True,
         mode: RunMode | str = RunMode.TRAIN,
         wav_processor: str = "kresnik/wav2vec2-large-xlsr-korean",
         sampling_rate: int = 16_000,
         wav_max_length: int = 112_000, # 16_000 * 7, 7secs duration
         txt_processor: str = "klue/bert-base",
         txt_max_length: int = 64,
+        multilabel: bool = False,
         load_from_cache_file: bool = True,
         num_proc: int = 8,
+        batched: bool = True,
+        batch_size: int = 1000, # Not a torch batch_size
+        writer_batch_size: int = 1000,
         num_data: int = None,
+        preprocess: bool = True,
     ):
         """ Loads dataset and do pre-process
         Trunctae wav & text to designated maximum length
@@ -456,49 +507,84 @@ class HF_KEMD:
         logger.info("Load %s Huggingface KEMD Dataset", mode)
         self.mode = RunMode[mode.upper()] if isinstance(mode, str) else mode
 
-        ds: datasets.arrow_dataset.Dataset = self.load_dataset(paths=paths)
-        # Wave Processor
-        self.wav_processor = AutoProcessor.from_pretrained(wav_processor) if wav_processor else None
-        self.wav_kwargs = dict(
-            sampling_rate=sampling_rate,
-            max_length=wav_max_length,
-            truncation="only_first",
-            padding="max_length",
-            padding_value=0,
-            return_attention_mask=True,
-            return_tensors="pt",
-        )
-
-        # Text Tokenizer
-        self.txt_processor = AutoTokenizer.from_pretrained(txt_processor) if txt_processor else None
-        self.txt_kwargs = dict(
-            max_length=txt_max_length,
-            truncation="only_first",
-            padding="max_length",
-            return_attention_mask=True,
-            return_tensors="pt",
-        )
-
-        # Pre-process
-        map_kwargs = dict(
-            batched=True,
-            desc=f"Pre-process wave & text {mode}",
-            load_from_cache_file=load_from_cache_file,
-            num_proc=num_proc,
-        )
-        self.ds = ds.map(self.preprocess, **map_kwargs).with_format("torch")
-        # Limit number of data for debug (Fast Dev)
-        if isinstance(num_data, int):
-            if num_data in range(0, len(self.ds)):
-                self.num_data = num_data
+        ds_name = f"{paths}_{self.mode.value}{validation_fold}"
+        try:
+            logger.info("Try Loading dataset %s from disk", ds_name)
+            self.ds = datasets.load_from_disk(ds_name)
+            logger.info("Successfully loaded %s from disk", ds_name)
+        except FileNotFoundError:
+            if os.path.exists(ds_name):
+                logger.warn("Was not able to load %s. Please check dataset path", ds_name)
             else:
-                self.num_data = round(0.05 * len(self.ds))
-        else:
-            self.num_data = None
-        logger.info("# %s Data: %s", mode, len(self))
+                logger.info("File not found. Generate hf dataset from scratch")
+                logger.info(
+                    "Note that if you're running `train.py`, num_proc should be 1, due to unknown deadlocks"
+                )
+                logger.info("num_proc given: %s", num_proc)
+                
+            ds_kwargs = dict(
+                # Note for hard-coded kwargs
+                generate_csv=False,
+                return_bio=False,
+                tokenizer_name=None,
+                max_length_wav=wav_max_length,
+                max_length_txt=txt_max_length,
+                multilabel=multilabel,
+                validation_fold=validation_fold,
+                mode=mode,
+                num_data=num_data,
+            )
+            ds: torch.utils.data.Dataset = self.load_dataset(paths=paths, **ds_kwargs)
+            def gen():
+                for idx in range(len(ds)):
+                    yield ds[idx]
+            # TODO: multiprocessing requires extra shards in `from_generator`
+            # https://huggingface.co/docs/datasets/v2.10.0/en/package_reference/main_classes#datasets.Dataset
+            self.ds: datasets.arrow_dataset.Dataset = datasets.Dataset.from_generator(gen)
+
+            # Wave Process
+            logger.info("Load wave processor from %s", wav_processor)
+            self.wav_processor = AutoProcessor.from_pretrained(wav_processor) if wav_processor else None
+            self.wav_kwargs = dict(
+                sampling_rate=sampling_rate,
+                max_length=wav_max_length,
+                truncation="only_first",
+                padding="max_length",
+                padding_value=0,
+                return_attention_mask=True,
+                return_tensors="pt",
+            )
+
+            # Text Tokenizer
+            logger.info("Load text processor from %s", txt_processor)
+            self.txt_processor = AutoTokenizer.from_pretrained(txt_processor) if txt_processor else None
+            self.txt_kwargs = dict(
+                max_length=txt_max_length,
+                truncation="only_first",
+                padding="max_length",
+                return_attention_mask=True,
+                return_tensors="pt",
+            )
+
+            # Pre-process
+            self.map_kwargs = dict(
+                batched=batched,
+                batch_size=batch_size,
+                writer_batch_size=writer_batch_size,
+                desc=f"Pre-process wave & text {mode}",
+                load_from_cache_file=load_from_cache_file,
+                num_proc=num_proc,
+            )
+            if preprocess:
+                logger.info("Start pre-processing")
+                self.ds = self.ds.map(self.preprocess, **self.map_kwargs).with_format("torch")
+                logger.info("End up pre-processing")
+            if save_to_disk:
+                self.ds.save_to_disk(ds_name)
+                logger.info("Sucessfully saved to disk as %s", ds_name)
 
     def __len__(self):
-        return len(self.ds) if not self.num_data else len(self.ds[:self.num_data])
+        return len(self.ds)
 
     def __getitem__(self, idx: int):
         return self.ds[idx]
@@ -513,40 +599,39 @@ class HF_KEMD:
         batch["txt"] = txt["input_ids"]
         batch["txt_mask"] = txt["attention_mask"]
         return batch
-        
-    def _load_dataset(self, path: str | Path):
-        """ Loads huggingface dataset saved in .arr(feather) 
-        If dataset does not exists, generate a new dataset. """
-        if os.path.exists(path):
-            logger.info("Load from disk, %s", path)
-            ds = datasets.load_from_disk(path)
-        else:
-            logger.info("HF Dataset not found. Newly save from scratch. Path: %s", path)
-            ds = run_generate_datasets(dataset_name=path)
-        if self.validation_fold > 0:
-            self.NUM_FOLDS = 5
-            self.NUM_SESSIONS = {"kemdy19": 20, "kemdy20": 40}[path]
-            ds = ds.filter(self.split_folds, input_columns=["id"], load_from_cache_file=False)
+
+    def _load_dataset(self, path, **kwargs):
+        ds: torch.utils.data.Dataset = {
+            "kemdy19": KEMDy19Dataset,
+            "kemdy20": KEMDy20Dataset,
+        }[path](**kwargs)
         return ds
 
-    def split_folds(self, _id: list):
-        fold_dict: dict = get_folds(num_session=self.NUM_SESSIONS, num_folds=self.NUM_FOLDS)
-        fold_range: range = fold_dict[self.validation_fold]
-        _id = int(_id.split("_")[0][-2:])
-        include: bool = not (_id in (fold_range)) if self.mode == RunMode.TRAIN else \
-                        _id in (fold_range)
-        return include
-            
-    def load_dataset(self, paths):
-        if isinstance(paths, str | Path):
-            # Single data given
-            ds = self._load_dataset(path=paths)
-        elif isinstance(paths, Iterable):
-            ds = datasets.concatenate_datasets([self._load_dataset(path) for path in paths])
-        else:
+    def load_dataset(self, paths, **kwargs):
+        try:
+            paths = paths.split("-")
+            ds = torch.utils.data.ConcatDataset(
+                [self._load_dataset(path, **kwargs) for path in paths]
+            )
+        except:
             logger.warn("Wrongly given dataset. %s", paths)
-            raise FileNotFoundError
+            raise
         return ds
+
+
+def get_dataloaders(ds_cfg: omegaconf.DictConfig,
+                    dl_cfg: omegaconf.DictConfig,
+                    modes: list = ["train", "valid"]) -> dict:
+    dl_dict = {"train": None, "valid": None, "test": None}
+    for mode in modes:
+        # Should load saved datasets
+        # Preprocess from scratch has errors
+        # 1. `num_proc` > 1 gets deadlocked
+        # 2. `num_proc` = 1 will take 20 minutes for pre-processing
+        _ds = hydra.utils.instantiate(ds_cfg, mode=mode).ds
+        _dl = hydra.utils.instantiate(dl_cfg, dataset=_ds)
+        dl_dict[mode] = _dl
+    return dl_dict
 
 
 if __name__=="__main__":
