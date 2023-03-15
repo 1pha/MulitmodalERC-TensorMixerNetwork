@@ -25,6 +25,7 @@ optim:
 misc:
   seed: 42
   debug: False
+  modes: [ train, valid ]
   # "w11wo/wav2vec2-xls-r-300m-korean" for other pre-trained
 
 module:
@@ -65,9 +66,9 @@ callbacks:
   # https://pytorch-lightning.readthedocs.io/en/stable/common/early_stopping.html
   early_stop:
     _target_: pytorch_lightning.callbacks.early_stopping.EarlyStopping
-    monitor: "epoch/valid_loss"
+    monitor: epoch/valid_loss
     mode: min
-    patience: 3
+    patience: 20
   
   # https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.callbacks.LearningRateMonitor.html
   lr_monitor:
