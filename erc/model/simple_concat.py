@@ -20,7 +20,9 @@ class SimpleConcat(nn.Module):
         
         self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, self.wav_model.config.classifier_proj_size)
         self.txt_projector = nn.Linear(768, self.wav_model.config.classifier_proj_size)
-        self.simple_concat = nn.Linear(self.wav_model.config.classifier_proj_size*2, 9)
+        self.simple_concat_1 = nn.Linear(self.wav_model.config.classifier_proj_size*2, self.wav_model.config.classifier_proj_size)
+        # self.dropout = nn.Dropout(0.2)
+        self.simple_concat_2 = nn.Linear(self.wav_model.config.classifier_proj_size, 9)
 
         self.criterions = criterions
         if not (0 < cls_coef < 1):
@@ -59,7 +61,8 @@ class SimpleConcat(nn.Module):
 
         # (B, WAV_proj_size + BERT_proj_size)
         concat_output = torch.cat((pooled_wav_output, pooled_txt_output), dim=1)
-        logits = self.simple_concat(concat_output) # (B, num_labels)
+        concat_output = self.simple_concat_1(concat_output) # (B, num_labels)
+        logits = self.simple_concat_2(concat_output) # (B, num_labels)
 
         # calcuate the loss fct
         cls_logits = logits[:, :-2]
