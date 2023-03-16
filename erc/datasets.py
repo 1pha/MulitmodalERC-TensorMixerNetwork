@@ -636,22 +636,16 @@ class AIHubDialog(KEMDBase):
         self.txt_folder_total = sorted(glob(os.path.join(PRETRAINED_DATA_PATH, 'annotation')+'/*.csv'))
         self.wav_folder_total = sorted(glob(os.path.join(PRETRAINED_DATA_PATH, 'wav')+'/*.wav'))
         self.max_length_wav = None
-        self.mode = mode
 
         # split into train-valid 
-        train_idx, valid_idx = self.sampling_with_ratio(len(self.txt_folder_total), train_ratio=0.8)
-        if mode == "train":
-            self.txt_folder = self.get_sub_list(self.txt_folder_total, train_idx)
-            self.wav_folder = self.get_sub_list(self.wav_folder_total, train_idx)
-        elif mode == "valid":
-            self.txt_folder = self.get_sub_list(self.txt_folder_total, valid_idx)
-            self.wav_folder = self.get_sub_list(self.wav_folder_total, valid_idx)
-        else:
-            assert "check mode"
-            
+        index_list = self.sampling_with_ratio(len(self.txt_folder_total), mode, train_ratio=0.8)
+        self.txt_folder = self.get_sub_list(self.txt_folder_total, index_list)
+        self.wav_folder = self.get_sub_list(self.wav_folder_total, index_list)
+        
+
     def __len__(self):
-        assert len(glob(self.wav_folder)) == len(glob(self.txt_folder))
-        return len(glob(self.wav_folder)) 
+        assert len(self.wav_folder) == len(self.txt_folder)
+        return len(self.wav_folder) 
     
     def __getitem__(self, idx: int):
         data = {}
@@ -673,14 +667,22 @@ class AIHubDialog(KEMDBase):
         return data
 
     @staticmethod
-    def sampling_with_ratio(total_len : int, train_ratio = 0.8):
+    def sampling_with_ratio(total_len : int, mode : str, train_ratio = 0.8):
+
         total_idx = [i for i in range(total_len)]
         train_num = int(total_len * train_ratio)
 
-        train_idx = random.sample(total_idx, train_num,seed=42)
+        train_idx = random.sample(total_idx, train_num)
         valid_idx = list(set(total_idx) - set(train_idx))
 
-        return train_idx, valid_idx
+        if mode == "train":
+            index_list = train_idx
+        elif mode == "valid":
+            index_list = valid_idx
+        else:
+            assert "check mode"
+
+        return index_list
 
     @staticmethod
     def get_sub_list(in_list, in_indices):
