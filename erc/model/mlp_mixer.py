@@ -111,7 +111,7 @@ class MLP_Mixer(nn.Module):
             # Single label case
             cls_loss = self.criterions["cls"](cls_logits, cls_labels.long())
         elif cls_labels.ndim == 2:
-            # Single label case
+            # Multi label case
             cls_loss = self.criterions["cls"](cls_logits, cls_labels.float())
             cls_labels = cls_labels.argmax(dim=1)
         

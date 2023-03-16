@@ -1,11 +1,11 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict
 
 import hydra
 import omegaconf
 import pytorch_lightning as pl
 import torch
+from tqdm.auto import tqdm
 from torch import nn
-import torchmetrics.functional as tof
 from torchmetrics import Accuracy, AUROC, ConcordanceCorrCoef, F1Score
 import wandb
 
@@ -115,16 +115,19 @@ class ERCModule(pl.LightningModule):
             raise RuntimeError
 
     def _sort_outputs(self, outputs: List[Dict]):
-        result = dict()
-        keys: list = outputs[0].keys()
-        for key in keys:
-            data = outputs[0][key]
-            if data.ndim == 0:
-                # Scalar value result
-                result[key] = torch.stack([o[key] for o in outputs])
-            elif data.ndim in [1, 2]:
-                # Batched 
-                result[key] = torch.concat([o[key] for o in outputs])
+        try:
+            result = dict()
+            keys: list = outputs[0].keys()
+            for key in keys:
+                data = outputs[0][key]
+                if data.ndim == 0:
+                    # Scalar value result
+                    result[key] = torch.stack([o[key] for o in outputs])
+                elif data.ndim in [1, 2]:
+                    # Batched 
+                    result[key] = torch.concat([o[key] for o in outputs])
+        except AttributeError:
+            logger.warn("Error provoking data %s", outputs)
         return result
     
     def log_result(
@@ -164,7 +167,7 @@ class ERCModule(pl.LightningModule):
                                          class_names=self.label_keys)
         self.logger.experiment.log({"confusion_matrix": cf})
 
-    def training_step(self, batch, batch_idx, optimizer_idx):
+    def training_step(self, batch, batch_idx, optimizer_idx=None):
         result = self.forward(batch)
         result = self.log_result(outputs=result, mode="train", unit="step")
         return result
