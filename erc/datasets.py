@@ -551,6 +551,8 @@ class HF_KEMD:
             # TODO: multiprocessing requires extra shards in `from_generator`
             # https://huggingface.co/docs/datasets/v2.10.0/en/package_reference/main_classes#datasets.Dataset
             self.ds: datasets.arrow_dataset.Dataset = datasets.Dataset.from_generator(gen)
+            if isinstance(num_data, int):
+                self.ds = self.ds[:num_data]
 
             # Wave Process
             logger.info("Load wave processor from %s", wav_processor)
