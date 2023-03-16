@@ -12,7 +12,7 @@ defaults:
 
 dataloader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 12
+  batch_size: 8
   num_workers: 4
   dataset: ${dataset}
 
@@ -31,6 +31,10 @@ misc:
 module:
   _target_: erc.trainer.ERCModule
   _recursive_: False
+  separate_lr: 
+    wav_model: 1e-5
+    txt_model: 1e-5
+    mlp_mixer: 1e-4
 
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
@@ -56,7 +60,7 @@ callbacks:
     _target_: pytorch_lightning.callbacks.ModelCheckpoint
     dirpath: ${hydra:run.dir}
     filename: "{step}-valid_loss{epoch/valid_loss:.3f}"
-    monitor: "epoch/valid_loss"
+    monitor: "epoch/valid_acc"
     mode: min
     save_top_k: 3
     save_last: True

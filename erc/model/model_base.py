@@ -1,10 +1,8 @@
 """ Base for training
 """
-import torch
-from transformers import Wav2Vec2ForSequenceClassification, BertForSequenceClassification
+from torch import nn
 
-from erc.constants import Task
 
-class ModelBase:
+class ModelBase(nn.Module):
     def __init__(self,):
-        pass
+        super().__init__()

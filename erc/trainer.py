@@ -20,10 +20,10 @@ class ERCModule(pl.LightningModule):
                  model: nn.Module,
                  train_loader: torch.utils.data.DataLoader,
                  valid_loader: torch.utils.data.DataLoader,
-                 optimizer: torch.optim.Optimizer,
-                 scheduler: dict = None,
+                 optimizer: omegaconf.DictConfig,
+                 scheduler: omegaconf.DictConfig = None,
                  load_from_checkpoint: str = None,
-                 ):
+                 separate_lr: dict = None):
         super().__init__()
         self.model = model
 
@@ -32,8 +32,24 @@ class ERCModule(pl.LightningModule):
         self.valid_loader = valid_loader
 
         # Optimizations
-        self.opt = optimizer
-        self.sch: dict = scheduler
+        if separate_lr is not None:
+            self.opt_config = []
+            for _submodel, _lr in separate_lr.items():
+                submodel = getattr(self.model, _submodel, None)
+                if submodel is None:
+                    logger.warn("separate_lr was given but submodel was not found: %s", _submodel)
+                    self.opt_config = self._configure_optimizer(optimizer=optimizer,
+                                                                scheduler=scheduler)
+                    break
+                _opt = hydra.utils.instantiate(optimizer,
+                                               lr=_lr,
+                                               params=submodel.parameters())
+                _sch = hydra.utils.instantiate(scheduler, scheduler={"optimizer": _opt})
+                self.opt_config.append({
+                    "optimizer": _opt, "lr_scheduler": dict(**_sch)
+                })
+        else:
+            self.opt_config = self._configure_optimizer(optimizer=optimizer, scheduler=scheduler)
 
         # Metrics Configuration
         self.acc = Accuracy(task="multiclass", num_classes=7)
@@ -54,15 +70,18 @@ class ERCModule(pl.LightningModule):
 
     def valid_dataloader(self):
         return self.valid_loader
+
+    def _configure_optimizer(self, optimizer: omegaconf.DictConfig, scheduler: omegaconf.DictConfig):
+        opt = hydra.utils.instantiate(optimizer, params=self.model.parameters())
+        sch: dict = hydra.utils.instantiate(scheduler, scheduler={"optimizer": opt})\
+                            if scheduler is not None else None
+        opt_config = {
+            "optimizer": opt, "lr_scheduler": dict(**sch)
+        } if sch is not None else opt
+        return opt_config
     
     def configure_optimizers(self) -> torch.optim.Optimizer | dict:
-        if self.sch is not None:
-            return {
-                "optimizer": self.opt,
-                "lr_scheduler": dict(**self.sch)
-            }
-        else:
-            return self.opt
+        return self.opt_config
 
     def get_label(self, batch: dict, task: erc.constants.Task = None):
         task = task or self.model.TASK
@@ -74,8 +93,8 @@ class ERCModule(pl.LightningModule):
             labels = torch.stack([batch["valence"], batch["arousal"]], dim=1).float()
         elif task == erc.constants.Task.ALL:
             labels = {
-                "emotion": batch["emotion"].long(),
-                "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1).float(),
+                "emotion": batch["emotion"],
+                "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1),
             }
         # TODO: Add Multilabel Fetch
         return labels
@@ -145,7 +164,7 @@ class ERCModule(pl.LightningModule):
                                          class_names=self.label_keys)
         self.logger.experiment.log({"confusion_matrix": cf})
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx, optimizer_idx):
         result = self.forward(batch)
         result = self.log_result(outputs=result, mode="train", unit="step")
         return result
@@ -170,15 +189,8 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
 
     logger.info("Start intantiating Models & Optimizers")
     model = hydra.utils.instantiate(config.model)
-    optim = hydra.utils.instantiate(config.optim, params=model.parameters())
-    sch = hydra.utils.instantiate(config.scheduler, scheduler={"optimizer": optim})\
-          if config.get("scheduler", None) else None
 
     logger.info("Start instantiating dataloaders")
-    # train_dataset = hydra.utils.instantiate(config.dataset, mode="train")
-    # train_loader = hydra.utils.instantiate(config.dataloader, dataset=train_dataset)
-    # valid_dataset = hydra.utils.instantiate(config.dataset, mode="valid")
-    # valid_loader = hydra.utils.instantiate(config.dataloader, dataset=valid_dataset)
     dataloaders = erc.datasets.get_dataloaders(ds_cfg=config.dataset,
                              dl_cfg=config.dataloader,
                              modes=config.misc.modes)
@@ -186,8 +198,8 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     logger.info("Start instantiating Pytorch-Lightning Trainer")
     module = hydra.utils.instantiate(config.module,
                                       model=model,
-                                      optimizer=optim,
-                                      scheduler=sch,
+                                      optimizer=config.optim,
+                                      scheduler=config.scheduler,
                                       train_loader=dataloaders["train"],
                                       valid_loader=dataloaders["valid"])
     return module, dataloaders
