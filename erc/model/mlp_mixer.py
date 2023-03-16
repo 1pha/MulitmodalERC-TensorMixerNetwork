@@ -84,7 +84,7 @@ class MLP_Mixer(nn.Module):
          WAV_proj_size: 256
          BERT_hidden_dim: 768
          BERT_proj_size: 256
-           """
+        """
         # WAV 
         wav_outputs = self.wav_model(input_values=wav, attention_mask=wav_mask) # (B, S, WAV_hidden_dim)
         hidden_states = self.wav_projector(wav_outputs[0]) # (B, S, WAV_proj_size) 
