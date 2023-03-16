@@ -705,8 +705,7 @@ def get_dataloaders(ds_cfg: omegaconf.DictConfig,
         _ds = hydra.utils.instantiate(ds_cfg, mode=mode).ds
         _dl = hydra.utils.instantiate(dl_cfg,
                                       dataset=_ds,
-                                      shuffle=True)
-                                    #   shuffle=(True if mode == "train" else False))
+                                      shuffle=(True if mode == "train" else False))
         dl_dict[mode] = _dl
     return dl_dict
 
