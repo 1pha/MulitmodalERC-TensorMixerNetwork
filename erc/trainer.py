@@ -81,7 +81,6 @@ class ERCModule(pl.LightningModule):
         return opt_config
     
     def configure_optimizers(self) -> torch.optim.Optimizer | dict:
-        breakpoint()
         return self.opt_config
 
     def get_label(self, batch: dict, task: erc.constants.Task = None):
