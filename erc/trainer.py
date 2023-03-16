@@ -164,8 +164,7 @@ class ERCModule(pl.LightningModule):
     def log_confusion_matrix(self, result: dict):
         breakpoint()
         preds = result["cls_pred"].cpu().detach()
-        if not torch.allclose(preds.sum(dim=1)):
-            preds = preds.argmax(dim=1).numpy()
+        preds = preds.argmax(dim=1).numpy()
         labels = result["emotion"].cpu().numpy()
         cf = wandb.plot.confusion_matrix(y_true=labels,
                                          preds=preds,
