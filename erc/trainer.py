@@ -1,3 +1,4 @@
+import importlib
 from typing import List, Dict
 
 import hydra
@@ -45,7 +46,8 @@ class ERCModule(pl.LightningModule):
                     {"params": submodel.parameters(), "lr": _lr}
                 )
             _o = optimizer.pop("_target_").split(".")
-            _oc = importlib.import_module(".".join(_o[:-1], _o[-1]))
+            _oc = importlib.import_module(".".join(_o[:-1]))
+            _oc = getattr(_oc, _o[-1])
             _opt = _oc(params=_opt_groups, **optimizer)
             _sch = hydra.utils.instantiate(scheduler, scheduler={"optimizer": _opt})
             self.opt_config = {"optimizer": _opt, "lr_scheduler": dict(**_sch)}
