@@ -107,7 +107,6 @@ class ERCModule(pl.LightningModule):
                                       txt=batch["txt"],
                                       txt_mask=batch["txt_mask"],
                                       labels=labels)
-            breakpoint()
             return result
         except RuntimeError:
             # For CUDA Device-side asserted error
@@ -162,7 +161,6 @@ class ERCModule(pl.LightningModule):
         return result
         
     def log_confusion_matrix(self, result: dict):
-        breakpoint()
         preds = result["cls_pred"].cpu().detach()
         preds = preds.argmax(dim=1).numpy()
         labels = result["emotion"].cpu().numpy()
