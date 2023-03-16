@@ -33,7 +33,7 @@ class ERCModule(pl.LightningModule):
 
         # Optimizations
         if separate_lr is not None:
-            self.opt_config = []
+            _opt_groups = []
             for _submodel, _lr in separate_lr.items():
                 submodel = getattr(self.model, _submodel, None)
                 if submodel is None:
@@ -41,13 +41,12 @@ class ERCModule(pl.LightningModule):
                     self.opt_config = self._configure_optimizer(optimizer=optimizer,
                                                                 scheduler=scheduler)
                     break
-                _opt = hydra.utils.instantiate(optimizer,
-                                               lr=_lr,
-                                               params=submodel.parameters())
+                _opt_groups.append(
+                    {"params": submodel.parameters(), "lr": _lr}
+                )
+                _opt = hydra.utils.instantiate(optimizer, params=_opt_groups)
                 _sch = hydra.utils.instantiate(scheduler, scheduler={"optimizer": _opt})
-                self.opt_config.append({
-                    "optimizer": _opt, "lr_scheduler": dict(**_sch)
-                })
+            self.opt_config = {"optimizer": _opt, "lr_scheduler": dict(**_sch)}
         else:
             self.opt_config = self._configure_optimizer(optimizer=optimizer, scheduler=scheduler)
 
