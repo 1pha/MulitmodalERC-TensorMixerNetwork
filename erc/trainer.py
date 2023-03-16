@@ -44,8 +44,9 @@ class ERCModule(pl.LightningModule):
                 _opt_groups.append(
                     {"params": submodel.parameters(), "lr": _lr}
                 )
-            breakpoint()
-            _opt = hydra.utils.instantiate(optimizer, params=_opt_groups)
+            _o = optimizer.pop("_target_").split(".")
+            _oc = importlib.import_module(".".join(_o[:-1], _o[-1]))
+            _opt = _oc(params=_opt_groups, **optimizer)
             _sch = hydra.utils.instantiate(scheduler, scheduler={"optimizer": _opt})
             self.opt_config = {"optimizer": _opt, "lr_scheduler": dict(**_sch)}
         else:
