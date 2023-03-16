@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,6 +23,7 @@ class KLDiv(nn.Module):
         super().__init__()
         self.kldiv = nn.KLDivLoss(reduction="batchmean", log_target=True)
         self.num_classes = num_classes
+        warnings.warn(f"Please note that KL-Divergence loss always do log-softmax on target.")
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """

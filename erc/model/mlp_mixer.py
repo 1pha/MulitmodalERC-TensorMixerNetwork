@@ -77,7 +77,8 @@ class MLP_Mixer(nn.Module):
         txt: torch.Tensor,
         txt_mask: torch.Tensor,
         labels: torch.Tensor = None,
-        **kwargs) -> dict:
+        **kwargs
+    ) -> dict:
         """ Size
          WAV_hidden_dim: 1024
          WAV_proj_size: 256
@@ -105,8 +106,15 @@ class MLP_Mixer(nn.Module):
 
         # calcuate the loss fct
         cls_logits = logits[:, :-2]
-        cls_loss = self.criterions["cls"](cls_logits, labels["emotion"].long())
-
+        cls_labels = labels["emotion"]
+        if cls_labels.ndim == 1:
+            # Single label case
+            cls_loss = self.criterions["cls"](cls_logits, cls_labels.long())
+        elif cls_labels.ndim == 2:
+            # Single label case
+            cls_loss = self.criterions["cls"](cls_logits, cls_labels.float())
+            cls_labels = cls_labels.argmax(dim=1)
+        
         reg_logits = logits[:, -2:]
         reg_loss = self.criterions["reg"](reg_logits, labels["regress"].float())
 
@@ -115,7 +123,7 @@ class MLP_Mixer(nn.Module):
             "loss": total_loss,
             "cls_loss": cls_loss.detach().cpu(),
             "reg_loss": reg_loss.detach().cpu(),
-            "emotion": labels["emotion"].detach(),
+            "emotion": cls_labels.detach(),
             "regress": labels["regress"].detach(),
             "cls_pred": cls_logits.detach(),
             "reg_pred": reg_logits.detach(),
