@@ -107,6 +107,7 @@ class ERCModule(pl.LightningModule):
                                       txt=batch["txt"],
                                       txt_mask=batch["txt_mask"],
                                       labels=labels)
+            breakpoint()
             return result
         except RuntimeError:
             # For CUDA Device-side asserted error
@@ -128,6 +129,7 @@ class ERCModule(pl.LightningModule):
                     result[key] = torch.concat([o[key] for o in outputs])
         except AttributeError:
             logger.warn("Error provoking data %s", outputs)
+            breakpoint()
         return result
     
     def log_result(
@@ -160,7 +162,10 @@ class ERCModule(pl.LightningModule):
         return result
         
     def log_confusion_matrix(self, result: dict):
-        preds = result["cls_pred"].argmax(dim=1).cpu().detach().numpy()
+        breakpoint()
+        preds = result["cls_pred"].cpu().detach()
+        if not torch.allclose(preds.sum(dim=1)):
+            preds = preds.argmax(dim=1).numpy()
         labels = result["emotion"].cpu().numpy()
         cf = wandb.plot.confusion_matrix(y_true=labels,
                                          preds=preds,
