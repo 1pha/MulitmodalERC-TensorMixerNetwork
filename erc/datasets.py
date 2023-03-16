@@ -1,7 +1,10 @@
 import os
+import random 
+
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Tuple
+from glob import glob 
 
 import hydra
 import datasets
@@ -17,6 +20,7 @@ from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20, run_
 from erc.utils import check_exists, get_logger
 from erc.constants import RunMode, emotion2idx, gender2idx
 
+random.seed(42)
 
 logger = get_logger(name=__name__)
 
@@ -36,6 +40,7 @@ class KEMDBase(Dataset):
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
+        **kwargs
     ):
         """
         Args:
@@ -322,6 +327,7 @@ class KEMDy19Dataset(KEMDBase):
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
+        **kwargs
     ):
         super(KEMDy19Dataset, self).__init__(
             base_path,
@@ -379,6 +385,7 @@ class KEMDy20Dataset(KEMDBase):
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
+        **kwargs
     ):
         super(KEMDy20Dataset, self).__init__(
             base_path,
@@ -478,6 +485,7 @@ class HF_KEMD:
         paths: str = "kemdy19-kemdy20",
         validation_fold: int = 4,
         save_to_disk: bool = True,
+        PRETRAINED_DATA_PATH: str = "./aihub",
         mode: RunMode | str = RunMode.TRAIN,
         wav_processor: str = "kresnik/wav2vec2-large-xlsr-korean",
         sampling_rate: int = 16_000,
@@ -534,6 +542,7 @@ class HF_KEMD:
                 validation_fold=validation_fold,
                 mode=mode,
                 num_data=num_data,
+                PRETRAINED_DATA_PATH=PRETRAINED_DATA_PATH,
             )
             ds: torch.utils.data.Dataset = self.load_dataset(paths=paths, **ds_kwargs)
             def gen():
@@ -605,6 +614,7 @@ class HF_KEMD:
         ds: torch.utils.data.Dataset = {
             "kemdy19": KEMDy19Dataset,
             "kemdy20": KEMDy20Dataset,
+            "aihub": AIHubDialog,
         }[path](**kwargs)
         return ds
 
@@ -618,6 +628,67 @@ class HF_KEMD:
             logger.warn("Wrongly given dataset. %s", paths)
             raise
         return ds
+
+
+class AIHubDialog(KEMDBase):
+    NAME = "AIHubDialog"
+    # PRETRAINED_DATA_PATH = '/home/hoesungryu/workspace/AI-Hub_emotion_dialog'
+    def __init__(self, PRETRAINED_DATA_PATH, mode, **kwargs):
+        self.txt_folder_total = sorted(glob(os.path.join(PRETRAINED_DATA_PATH, 'annotation')+'/*.csv'))
+        self.wav_folder_total = sorted(glob(os.path.join(PRETRAINED_DATA_PATH, 'wav')+'/*.wav'))
+        self.max_length_wav = None
+
+        # split into train-valid 
+        index_list = self.sampling_with_ratio(len(self.txt_folder_total), mode, train_ratio=0.8)
+        self.txt_folder = self.get_sub_list(self.txt_folder_total, index_list)
+        self.wav_folder = self.get_sub_list(self.wav_folder_total, index_list)
+        
+
+    def __len__(self):
+        assert len(self.wav_folder) == len(self.txt_folder)
+        return len(self.wav_folder) 
+    
+    def __getitem__(self, idx: int):
+        data = {}
+        txt, segment_id, emotion = pd.read_csv(self.txt_folder[idx]).iloc[0].values
+        data['segment_id'] = segment_id
+
+        # Txt File
+        data["txt"] = txt
+        data["txt_mask"] = None
+
+        # emotion 
+        data["emotion"] = self.get_emo(emotion)
+
+        sampling_rate, wav, wav_mask = self.get_wav(wav_path=self.wav_folder[idx])
+        data["sampling_rate"] = sampling_rate
+        data["wav"] = wav
+        data["wav_mask"] = wav_mask
+
+        return data
+
+    @staticmethod
+    def sampling_with_ratio(total_len : int, mode : str, train_ratio = 0.8):
+
+        total_idx = [i for i in range(total_len)]
+        train_num = int(total_len * train_ratio)
+
+        train_idx = random.sample(total_idx, train_num)
+        valid_idx = list(set(total_idx) - set(train_idx))
+
+        if mode == "train":
+            index_list = train_idx
+        elif mode == "valid":
+            index_list = valid_idx
+        else:
+            assert "check mode"
+
+        return index_list
+
+    @staticmethod
+    def get_sub_list(in_list, in_indices):
+        """리스트에서 복수인덱스 값을 가져온다"""
+        return [in_list[i] for i in in_indices]
 
 
 def get_dataloaders(ds_cfg: omegaconf.DictConfig,
