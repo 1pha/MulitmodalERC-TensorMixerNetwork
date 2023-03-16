@@ -2,6 +2,7 @@ import os
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Tuple
+from glob import glob 
 
 import hydra
 import datasets
@@ -617,6 +618,38 @@ class HF_KEMD:
             logger.warn("Wrongly given dataset. %s", paths)
             raise
         return ds
+
+
+class AIHubDialog(KEMDBase):
+    NAME = "AIHubDialog"
+    # PRETRAINED_DATA_PATH = '/home/hoesungryu/workspace/AI-Hub_emotion_dialog'
+    def __init__(self, PRETRAINED_DATA_PATH):
+        self.txt_folder = sorted(glob(os.path.join(PRETRAINED_DATA_PATH, 'annotation')+'/*.csv'))
+        self.wav_folder = sorted(glob(os.path.join(PRETRAINED_DATA_PATH, 'wav')+'/*.wav'))
+        self.max_length_wav = None
+
+    def __len__(self):
+        assert len(glob(self.wav_folder)) == len(glob(self.txt_folder))
+        return len(glob(self.wav_folder)) 
+    
+    def __getitem__(self, idx: int):
+        data = {}
+        txt, segment_id, emotion = pd.read_csv(self.txt_folder[idx]).iloc[0].values
+        data['segment_id'] = segment_id
+
+        # Txt File
+        data["txt"] = txt
+        data["txt_mask"] = None
+
+        # emotion 
+        data["emotion"] = self.get_emo(emotion)
+
+        sampling_rate, wav, wav_mask = self.get_wav(wav_path=self.wav_folder[idx])
+        data["sampling_rate"] = sampling_rate
+        data["wav"] = wav
+        data["wav_mask"] = wav_mask
+
+        return data
 
 
 def get_dataloaders(ds_cfg: omegaconf.DictConfig,
