@@ -717,7 +717,9 @@ def get_dataloaders(ds_cfg: omegaconf.DictConfig,
         # 1. `num_proc` > 1 gets deadlocked
         # 2. `num_proc` = 1 will take 20 minutes for pre-processing
         _ds = hydra.utils.instantiate(ds_cfg, mode=mode).ds
-        _dl = hydra.utils.instantiate(dl_cfg, dataset=_ds, shuffle=True)
+        _dl = hydra.utils.instantiate(dl_cfg,
+                                      dataset=_ds,
+                                      shuffle=(True if mode == "train" else False))
         dl_dict[mode] = _dl
     return dl_dict
 

@@ -1,3 +1,4 @@
+import importlib
 from typing import List, Dict
 
 import hydra
@@ -33,7 +34,7 @@ class ERCModule(pl.LightningModule):
 
         # Optimizations
         if separate_lr is not None:
-            self.opt_config = []
+            _opt_groups = []
             for _submodel, _lr in separate_lr.items():
                 submodel = getattr(self.model, _submodel, None)
                 if submodel is None:
@@ -41,13 +42,15 @@ class ERCModule(pl.LightningModule):
                     self.opt_config = self._configure_optimizer(optimizer=optimizer,
                                                                 scheduler=scheduler)
                     break
-                _opt = hydra.utils.instantiate(optimizer,
-                                               lr=_lr,
-                                               params=submodel.parameters())
-                _sch = hydra.utils.instantiate(scheduler, scheduler={"optimizer": _opt})
-                self.opt_config.append({
-                    "optimizer": _opt, "lr_scheduler": dict(**_sch)
-                })
+                _opt_groups.append(
+                    {"params": submodel.parameters(), "lr": _lr}
+                )
+            _o = optimizer.pop("_target_").split(".")
+            _oc = importlib.import_module(".".join(_o[:-1]))
+            _oc = getattr(_oc, _o[-1])
+            _opt = _oc(params=_opt_groups, **optimizer)
+            _sch = hydra.utils.instantiate(scheduler, scheduler={"optimizer": _opt})
+            self.opt_config = {"optimizer": _opt, "lr_scheduler": dict(**_sch)}
         else:
             self.opt_config = self._configure_optimizer(optimizer=optimizer, scheduler=scheduler)
 
@@ -128,6 +131,7 @@ class ERCModule(pl.LightningModule):
                     result[key] = torch.concat([o[key] for o in outputs])
         except AttributeError:
             logger.warn("Error provoking data %s", outputs)
+            breakpoint()
         return result
     
     def log_result(
@@ -160,7 +164,8 @@ class ERCModule(pl.LightningModule):
         return result
         
     def log_confusion_matrix(self, result: dict):
-        preds = result["cls_pred"].argmax(dim=1).cpu().detach().numpy()
+        preds = result["cls_pred"].cpu().detach()
+        preds = preds.argmax(dim=1).numpy()
         labels = result["emotion"].cpu().numpy()
         cf = wandb.plot.confusion_matrix(y_true=labels,
                                          preds=preds,
