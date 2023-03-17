@@ -146,3 +146,7 @@ audio_dataset_19/
 wav2vec2-xlsr-speech-emotion-classification/
 aihub_train4/
 aihub_valid4/
+
+# except jupyter notebook 
+modeling.ipynb
+hoesung_example.ipynb
