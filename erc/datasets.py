@@ -37,6 +37,7 @@ class KEMDBase(Dataset):
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
         multilabel: bool = False,
+        remove_deuce: bool = False,
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
@@ -72,6 +73,7 @@ class KEMDBase(Dataset):
         self.max_length_txt = max_length_txt
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name) if tokenizer_name else None
         self.multilabel = multilabel
+        self.remove_deuce = remove_deuce
         emo_col = list(emotion2idx.keys())
         emo_col.remove("disqust")
         self.emo_col = emo_col if multilabel else "emotion"
@@ -229,27 +231,26 @@ class KEMDBase(Dataset):
         If pre-processed .csv file does NOT exists, read from data path. """
         if not os.path.exists(self.TOTAL_DF_PATH) or generate_csv:
             logger.info(f"{self.TOTAL_DF_PATH} does not exists. Process from raw data")
-            total_df = self.merge_csv(base_path=self.base_path, save_path=self.TOTAL_DF_PATH)
+            total_df = self.merge_csv(base_path=self.base_path,
+                                      save_path=self.TOTAL_DF_PATH,
+                                      exclude_multilabel=not self.multilabel)
         else:
             try:
                 total_df = pd.read_csv(self.TOTAL_DF_PATH)
                 if self.multilabel:
+                    # Check if multilabel data has seven extra columns
                     if not set(self.emo_col) & set(total_df.columns):
                         total_df = self.merge_csv(base_path=self.base_path,
                                                   save_path=self.TOTAL_DF_PATH,
                                                   exclude_multilabel=False)
-                else:
-                    if total_df[self.emo_col].apply(lambda s: ";" in s).sum():
-                        # Multilabel should NOT be contained
-                        total_df = self.merge_csv(base_path=self.base_path,
-                                                  save_path=self.TOTAL_DF_PATH,
-                                                  exclude_multilabel=True)
             except pd.errors.EmptyDataError as e:
                 logger.error(f"{self.TOTAL_DF_PATH} seems to be empty")
                 logger.exception(e)
                 total_df = None
         
         df = self.split_folds(total_df=total_df, fold_num=fold_num, mode=self.mode)
+        if self.remove_deuce:
+            df = df[~df['emotion'].str.contains(';')]
         return df
     
     def split_folds(
@@ -277,9 +278,8 @@ class KEMDBase(Dataset):
             return self.vectorize(emotion)
 
     def vectorize(self, emotion: pd.Series) -> np.ndarray:
-        breakpoint()
         ev = emotion.values
-        ev = ev / ev.sum(dim=1)
+        ev = ev / ev.sum()
         return ev
     
     def str2num(self, key: str) -> torch.Tensor:
@@ -324,6 +324,7 @@ class KEMDy19Dataset(KEMDBase):
         max_length_txt: int = 50,
         tokenizer_name: str = None,
         multilabel: bool = False,
+        remove_deuce: bool = True,
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
@@ -337,6 +338,7 @@ class KEMDy19Dataset(KEMDBase):
             max_length_txt,
             tokenizer_name,
             multilabel,
+            remove_deuce,
             validation_fold,
             mode,
             num_data,
@@ -382,6 +384,7 @@ class KEMDy20Dataset(KEMDBase):
         max_length_txt: int = 50,
         tokenizer_name: str = None,
         multilabel: bool = False,
+        remove_deuce: bool = True,
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
@@ -395,6 +398,7 @@ class KEMDy20Dataset(KEMDBase):
             max_length_txt,
             tokenizer_name,
             multilabel,
+            remove_deuce,
             validation_fold,
             mode,
             num_data,
@@ -449,6 +453,7 @@ class KEMDDataset(Dataset):
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
         multilabel: bool = False,
+        remove_deuce: bool = True,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
     ):
@@ -458,6 +463,7 @@ class KEMDDataset(Dataset):
                                       max_length_txt=max_length_txt,
                                       tokenizer_name=tokenizer_name,
                                       multilabel=multilabel,
+                                      remove_deuce=remove_deuce,
                                       validation_fold=validation_fold,
                                       mode=mode,
                                       num_data=num_data)
@@ -466,6 +472,7 @@ class KEMDDataset(Dataset):
                                       max_length_txt=max_length_txt,
                                       tokenizer_name=tokenizer_name,
                                       multilabel=multilabel,
+                                      remove_deuce=remove_deuce,
                                       validation_fold=validation_fold,
                                       mode=mode,
                                       num_data=num_data)
@@ -493,6 +500,7 @@ class HF_KEMD:
         txt_processor: str = "klue/bert-base",
         txt_max_length: int = 64,
         multilabel: bool = False,
+        remove_deuce: bool = True,
         load_from_cache_file: bool = True,
         num_proc: int = 8,
         batched: bool = True,
@@ -539,6 +547,7 @@ class HF_KEMD:
                 max_length_wav=wav_max_length,
                 max_length_txt=txt_max_length,
                 multilabel=multilabel,
+                remove_deuce=remove_deuce,
                 validation_fold=validation_fold,
                 mode=mode,
                 num_data=num_data,
@@ -618,6 +627,7 @@ class HF_KEMD:
             "kemdy20": KEMDy20Dataset,
             "aihub": AIHubDialog,
         }[path](**kwargs)
+        logger.info("%s dataset has %s data", path, len(ds))
         return ds
 
     def load_dataset(self, paths, **kwargs):
