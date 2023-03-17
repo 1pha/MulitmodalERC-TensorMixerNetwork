@@ -268,7 +268,7 @@ class KEMDBase(Dataset):
             loc = ~sessions.isin(fold_range) if mode == RunMode.TRAIN else sessions.isin(fold_range)
             return total_df.loc[loc]
         
-    def get_emo(self, emotion: str | pd.Series) -> str | np.ndarray:
+    def get_emo(self, emotion: str | pd.Series) -> int | np.ndarray:
         if isinstance(emotion, str):
             # Single label cases
             return self.str2num(emotion)
@@ -667,7 +667,27 @@ class AIHubDialog(KEMDBase):
         data["wav"] = wav
         data["wav_mask"] = wav_mask
 
+        # Arousal / Valence
+        data["arousal"] = 0
+        data["valence"] = 0
+
         return data
+
+    def get_emo(self, emotion: str) -> int:
+        # Single label cases
+        str2num = {
+            "surprise": 0,
+            "suprise": 0,
+            "fear": 1,
+            "angry": 2,
+            "neutral": 3,
+            "happy": 4,
+            "sad": 5,
+            "disgust": 6,
+            "disqust": 6,
+        }
+        return str2num[emotion]
+
 
     @staticmethod
     def sampling_with_ratio(total_len : int, mode : str, train_ratio = 0.8):

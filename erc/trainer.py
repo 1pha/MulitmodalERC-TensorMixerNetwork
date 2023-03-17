@@ -94,7 +94,7 @@ class ERCModule(pl.LightningModule):
         elif task == erc.constants.Task.ALL:
             labels = {
                 "emotion": batch["emotion"],
-                "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1),
+                "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1).float(),
             }
         # TODO: Add Multilabel Fetch
         return labels

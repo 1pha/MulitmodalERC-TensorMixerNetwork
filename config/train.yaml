@@ -59,7 +59,7 @@ callbacks:
   checkpoint:
     _target_: pytorch_lightning.callbacks.ModelCheckpoint
     dirpath: ${hydra:run.dir}
-    filename: "{step}-valid_loss{epoch/valid_loss:.3f}"
+    filename: "{step}-valid_acc{epoch/valid_acc:.3f}"
     monitor: "epoch/valid_acc"
     mode: min
     save_top_k: 3
