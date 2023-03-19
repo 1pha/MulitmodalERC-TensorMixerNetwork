@@ -277,9 +277,8 @@ class KEMDBase(Dataset):
             return self.vectorize(emotion)
 
     def vectorize(self, emotion: pd.Series) -> np.ndarray:
-        breakpoint()
         ev = emotion.values
-        ev = ev / ev.sum(dim=1)
+        ev = ev / ev.sum()
         return ev
     
     def str2num(self, key: str) -> torch.Tensor:
