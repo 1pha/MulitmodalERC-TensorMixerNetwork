@@ -628,11 +628,14 @@ class HF_KEMD:
             "aihub": AIHubDialog,
         }[path](**kwargs)
         logger.info("%s dataset has %s data", path, len(ds))
+        logger.info("Sample data %s", ds[0])
         return ds
 
     def load_dataset(self, paths, **kwargs):
         try:
             paths = paths.split("-")
+            logger.info("Loading PyTorch dataset.")
+            logger.info("config: %s", kwargs)
             ds = torch.utils.data.ConcatDataset(
                 [self._load_dataset(path, **kwargs) for path in paths]
             )
