@@ -151,7 +151,7 @@ class ERCModule(pl.LightningModule):
                 result.update(
                     {k: _v[um] for k, _v in outputs.items() if _v.ndim > 0}
                 )
-                result["emotion"] = emotion.argmax(dim=1)
+                result["emotion"] = result["emotion"].argmax(dim=1)
             return result
         else:
             return result
@@ -203,7 +203,6 @@ class ERCModule(pl.LightningModule):
 
     def training_epoch_end(self, outputs: List[Dict]):
         result = self.log_result(outputs=outputs, mode="train", unit="epoch")
-        self.log_confusion_matrix(result)
 
     def validation_step(self, batch, batch_idx):
         result = self.forward(batch)
