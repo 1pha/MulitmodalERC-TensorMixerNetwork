@@ -45,10 +45,11 @@ class ERCModule(pl.LightningModule):
                 _opt_groups.append(
                     {"params": submodel.parameters(), "lr": _lr}
                 )
-            _o = optimizer.pop("_target_").split(".")
+            opt = dict(optimizer)
+            _o = opt.pop("_target_").split(".")
             _oc = importlib.import_module(".".join(_o[:-1]))
             _oc = getattr(_oc, _o[-1])
-            _opt = _oc(params=_opt_groups, **optimizer)
+            _opt = _oc(params=_opt_groups, **opt)
             _sch = hydra.utils.instantiate(scheduler, scheduler={"optimizer": _opt})
             self.opt_config = {"optimizer": _opt, "lr_scheduler": dict(**_sch)}
         else:
@@ -62,9 +63,6 @@ class ERCModule(pl.LightningModule):
         self.ccc_aro = ConcordanceCorrCoef(num_outputs=1)
 
         self.label_keys = list(erc.constants.emotion2idx.keys())[:-1]
-        if load_from_checkpoint:
-            logger.info("Load checkpoint from %s", load_from_checkpoint)
-            self.load_from_checkpoint(load_from_checkpoint)
         # TODO: Look-up what to save
         self.save_hyperparameters(ignore=["model"])
 
@@ -110,7 +108,8 @@ class ERCModule(pl.LightningModule):
                                       wav_mask=batch["wav_mask"],
                                       txt=batch["txt"],
                                       txt_mask=batch["txt_mask"],
-                                      labels=labels)
+                                      labels=labels,
+                                      gender=batch.get("gender", None))
             return result
         except RuntimeError:
             # For CUDA Device-side asserted error
@@ -134,7 +133,29 @@ class ERCModule(pl.LightningModule):
             logger.warn("Error provoking data %s", outputs)
             breakpoint()
         return result
-    
+
+    def remove_deuce(self, outputs: dict) -> dict:
+        """ Find deuced emotions and remove from batch """
+        result = outputs
+        emotion = outputs["emotion"]
+        if emotion.ndim == 2:
+            # For multi-dimensional emotion cases
+            _, num_class = emotion.shape
+            v, _ = emotion.max(dim=1)
+            v = v.unsqueeze(dim=1).repeat(1, num_class)
+            um = (emotion == v).sum(dim=1) == 1 # (bsz, ), unique mask
+            if (um.sum() == 0).item():
+                # If every batches had deuce data
+                result = {k: _v[um] for k, _v in outputs.items() if _v.ndim > 0}
+            else:
+                result.update(
+                    {k: _v[um] for k, _v in outputs.items() if _v.ndim > 0}
+                )
+                result["emotion"] = result["emotion"].argmax(dim=1)
+            return result
+        else:
+            return result
+
     def log_result(
         self, 
         outputs: List[Dict] | dict, 
@@ -142,6 +163,7 @@ class ERCModule(pl.LightningModule):
         unit: str = "epoch"
     ):
         result: dict = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
+        result = self.remove_deuce(outputs=result)
         # Log Losses
         for loss_key in ["loss", "cls_loss", "reg_loss"]:
             if loss_key in result:
@@ -152,26 +174,27 @@ class ERCModule(pl.LightningModule):
             self.acc(preds=result["cls_pred"], target=result["emotion"])
             self.auroc(preds=result["cls_pred"], target=result["emotion"])
             self.f1(preds=result["cls_pred"], target=result["emotion"])
-        self.log(f'{unit}/{mode}_acc', self.acc)
-        self.log(f'{unit}/{mode}_auroc', self.auroc)
-        self.log(f'{unit}/{mode}_f1', self.f1)
+            self.log(f'{unit}/{mode}_acc', self.acc)
+            self.log(f'{unit}/{mode}_auroc', self.auroc)
+            self.log(f'{unit}/{mode}_f1', self.f1)
 
         # Log Regression Metrics: CCC
         if "reg_pred" in result and "regress" in result:
             self.ccc_val(result["reg_pred"][:, 0], result["regress"][:, 0])
             self.ccc_aro(result["reg_pred"][:, 1], result["regress"][:, 1])
-        self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val)
-        self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro)
+            self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val)
+            self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro)
         return result
         
     def log_confusion_matrix(self, result: dict):
-        preds = result["cls_pred"].cpu().detach()
-        preds = preds.argmax(dim=1).numpy()
-        labels = result["emotion"].cpu().numpy()
-        cf = wandb.plot.confusion_matrix(y_true=labels,
-                                         preds=preds,
-                                         class_names=self.label_keys)
-        self.logger.experiment.log({"confusion_matrix": cf})
+        preds = result["cls_pred"].cpu().detach() if "cls_pred" in result else None
+        labels = result["emotion"].cpu().numpy() if "emotion" in result else None
+        if preds is not None and labels is not None:
+            preds = preds.argmax(dim=1).numpy()
+            cf = wandb.plot.confusion_matrix(y_true=labels,
+                                            preds=preds,
+                                            class_names=self.label_keys)
+            self.logger.experiment.log({"confusion_matrix": cf})
 
     def training_step(self, batch, batch_idx, optimizer_idx=None):
         result = self.forward(batch)
@@ -180,7 +203,6 @@ class ERCModule(pl.LightningModule):
 
     def training_epoch_end(self, outputs: List[Dict]):
         result = self.log_result(outputs=outputs, mode="train", unit="epoch")
-        self.log_confusion_matrix(result)
 
     def validation_step(self, batch, batch_idx):
         result = self.forward(batch)
@@ -196,8 +218,15 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     logger.info("Start Setting up")
     erc.utils._seed_everything(config.misc.seed)
 
+    ckpt = config.module.load_from_checkpoint
+    if ckpt:
+        ckpt = torch.load(ckpt)
+        model_ckpt = ckpt.pop("state_dict")
+    else:
+        model_ckpt = None
+
     logger.info("Start intantiating Models & Optimizers")
-    model = hydra.utils.instantiate(config.model)
+    model = hydra.utils.instantiate(config.model, checkpoint=model_ckpt)
 
     logger.info("Start instantiating dataloaders")
     dataloaders = erc.datasets.get_dataloaders(ds_cfg=config.dataset,
@@ -205,12 +234,27 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
                              modes=config.misc.modes)
     
     logger.info("Start instantiating Pytorch-Lightning Trainer")
+
+    # ckpt = config.module.load_from_checkpoint
+    # if ckpt:
+    #     logger.info("Load checkpoint from %s", ckpt)
+    #     _m = dict(config.module).pop("_target_").split(".")
+    #     _mc = importlib.import_module(".".join(_m[:-1]))
+    #     _mc = getattr(_mc, _m[-1])
+    #     module = _mc.load_from_checkpoint(ckpt,
+    #                                       model=model,
+    #                                       optimizer=config.optim,
+    #                                       scheduler=config.scheduler,
+    #                                       train_loader=dataloaders["train"],
+    #                                       valid_loader=dataloaders["valid"])
+    # else:
     module = hydra.utils.instantiate(config.module,
-                                      model=model,
-                                      optimizer=config.optim,
-                                      scheduler=config.scheduler,
-                                      train_loader=dataloaders["train"],
-                                      valid_loader=dataloaders["valid"])
+                                    model=model,
+                                    optimizer=config.optim,
+                                    scheduler=config.scheduler,
+                                    train_loader=dataloaders["train"],
+                                    valid_loader=dataloaders["valid"])
+
     return module, dataloaders
 
 

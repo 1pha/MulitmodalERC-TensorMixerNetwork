@@ -1,0 +1,7 @@
+_target_: erc.model.clip.CLIP
+config:
+  wav: kresnik/wav2vec2-large-xlsr-korean
+  txt: klue/bert-base
+
+criterion:
+  _target_: torch.nn.CrossEntropyLoss
