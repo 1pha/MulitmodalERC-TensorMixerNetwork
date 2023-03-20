@@ -1,6 +1,7 @@
 data/
 outputs/
 lightning_logs/
+aihub/
 kemdy19_train4/
 kemdy19_valid4/
 kemdy20_train4/
