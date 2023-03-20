@@ -9,8 +9,8 @@ read -p "Enter num_proc(num_threads) to preprocess datasets [8]: " num_proc
 num_proc=${num_proc:-8}
 
 echo "Create/Check valfold=${valfold} dataset"
-python -m fire erc.datasets HF_KEMD --mode=train --num_proc=${num_proc} --multilabel=True --validation_fold=${valfold}
-python -m fire erc.datasets HF_KEMD --mode=valid --num_proc=${num_proc} --multilabel=True --validation_fold=${valfold}
+python -m fire erc.datasets HF_KEMD --mode=train --num_proc=${num_proc} --multilabel=True --validation_fold=${valfold} --remove_deuce=False
+python -m fire erc.datasets HF_KEMD --mode=valid --num_proc=${num_proc} --multilabel=True --validation_fold=${valfold} --remove_deuce=False
 # python -m fire erc.datasets HF_KEMD --paths=aihub --mode=train --validation_fold=${valfold}
 # python -m fire erc.datasets HF_KEMD --paths=aihub --mode=valid --validation_fold=${valfold}
 

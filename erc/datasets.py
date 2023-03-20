@@ -1,7 +1,6 @@
 import os
 import random 
 
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Tuple
 from glob import glob 
@@ -16,9 +15,16 @@ from torch.utils.data import Dataset
 import torchaudio
 from transformers import AutoProcessor, AutoTokenizer
 
-from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20, run_generate_datasets
+from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20
 from erc.utils import check_exists, get_logger
-from erc.constants import RunMode, emotion2idx, gender2idx
+from erc.constants import (
+    RunMode,
+    emotion2idx,
+    gender2idx,
+    emotion_va_19_dict,
+    emotion_va_20_dict,
+    emotion_va_19_20_dict
+)
 
 random.seed(42)
 
@@ -160,6 +166,10 @@ class KEMDBase(Dataset):
         data["valence"] = torch.tensor(valence, dtype=torch.float)
         data["arousal"] = torch.tensor(arousal, dtype=torch.float)
 
+        # Vote Emotion
+        if self.multilabel:
+            data["vote_emotion"] = self.get_hard_vote(data=data)
+
         # Man-Female
         data["gender"] = self.gender2num(gender) # Sess01_script01_F003
         return data
@@ -225,6 +235,41 @@ class KEMDBase(Dataset):
             return input_ids, mask
         else:
             return txt, None
+        
+    def get_hard_vote(self, data: dict) -> torch.Tensor:
+        e = data["emotion"]
+        v = data["valence"]
+        a = data["arousal"]
+        
+        m = e == e.max()
+        if len(e[m]) > 1:
+            regress = torch.stack([v, a]).numpy()
+            ve = self._find_deuce_label(regress=regress, mask=m)
+        else:
+            ve = torch.tensor(e.argmax())
+        return ve
+    
+    def _find_deuce_label(self, regress: np.ndarray, mask: np.ndarray) -> torch.Tensor:
+        '''
+        Summary:
+            동률인 것 중 거리가 가장 작은 것을 사용하여 라벨을 확정한다. 
+        Input
+        regress = np.array([valence, arousal])
+        deuce_mask = np.array([False,  True, False,  True, False, False, False])
+        Return
+            voted index 
+        '''
+        mask = mask.nonzero()[0]
+        total_dist = []
+        eva_dict = {
+            "kemdy19": emotion_va_19_dict,
+            "kemdy20": emotion_va_20_dict,
+        }[self.NAME.lower()]
+        for index in mask:
+            center = np.array(eva_dict[f'{index}_centroid'])
+            dist = np.linalg.norm(regress - center, ord=2)
+            total_dist.append(dist)
+        return torch.tensor(mask[np.array(total_dist).argmin()]) # select minumum value index
 
     def processed_db(self, generate_csv: bool = False, fold_num: int = 4) -> pd.DataFrame:
         """ Reads in .csv file if exists.
@@ -524,11 +569,12 @@ class HF_KEMD:
         logger.info("Load %s Huggingface KEMD Dataset", mode)
         self.mode = RunMode[mode.upper()] if isinstance(mode, str) else mode
 
-        ds_name = f"{paths}_{self.mode.value}{validation_fold}"
+        ds_name = f"{paths}_{self.mode.value}{validation_fold}_multilabel{multilabel}_rdeuce{remove_deuce}"
         try:
             logger.info("Try Loading dataset %s from disk", ds_name)
-            self.ds = datasets.load_from_disk(ds_name)
+            self.ds = datasets.load_from_disk(ds_name)[:num_data]
             logger.info("Successfully loaded %s from disk", ds_name)
+            logger.info("# Datapoints %s", len(self))
         except FileNotFoundError:
             if os.path.exists(ds_name):
                 logger.warn("Was not able to load %s. Please check dataset path", ds_name)
@@ -658,7 +704,6 @@ class AIHubDialog(KEMDBase):
         self.txt_folder = self.get_sub_list(self.txt_folder_total, index_list)
         self.wav_folder = self.get_sub_list(self.wav_folder_total, index_list)
         
-
     def __len__(self):
         assert len(self.wav_folder) == len(self.txt_folder)
         return len(self.wav_folder) 

@@ -113,7 +113,10 @@ class MLP_Mixer(nn.Module):
         elif cls_labels.ndim == 2:
             # Multi label case
             cls_loss = self.criterions["cls"](cls_logits, cls_labels.float())
-            cls_labels = cls_labels.argmax(dim=1)
+            if "vote_emotion" in labels:
+                cls_labels = kwargs["vote_emotion"]
+            else:
+                cls_labels = cls_labels.argmax(dim=1)
         
         reg_logits = logits[:, -2:]
         reg_loss = self.criterions["reg"](reg_logits, labels["regress"].float())
