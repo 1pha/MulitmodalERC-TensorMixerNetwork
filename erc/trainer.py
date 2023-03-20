@@ -45,10 +45,11 @@ class ERCModule(pl.LightningModule):
                 _opt_groups.append(
                     {"params": submodel.parameters(), "lr": _lr}
                 )
-            _o = optimizer.pop("_target_").split(".")
+            opt = dict(optimizer)
+            _o = opt.pop("_target_").split(".")
             _oc = importlib.import_module(".".join(_o[:-1]))
             _oc = getattr(_oc, _o[-1])
-            _opt = _oc(params=_opt_groups, **optimizer)
+            _opt = _oc(params=_opt_groups, **opt)
             _sch = hydra.utils.instantiate(scheduler, scheduler={"optimizer": _opt})
             self.opt_config = {"optimizer": _opt, "lr_scheduler": dict(**_sch)}
         else:
@@ -62,9 +63,6 @@ class ERCModule(pl.LightningModule):
         self.ccc_aro = ConcordanceCorrCoef(num_outputs=1)
 
         self.label_keys = list(erc.constants.emotion2idx.keys())[:-1]
-        if load_from_checkpoint:
-            logger.info("Load checkpoint from %s", load_from_checkpoint)
-            self.load_from_checkpoint(load_from_checkpoint)
         # TODO: Look-up what to save
         self.save_hyperparameters(ignore=["model"])
 
@@ -221,8 +219,15 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     logger.info("Start Setting up")
     erc.utils._seed_everything(config.misc.seed)
 
+    ckpt = config.module.load_from_checkpoint
+    if ckpt:
+        ckpt = torch.load(ckpt)
+        model_ckpt = ckpt.pop("state_dict")
+    else:
+        model_ckpt = None
+
     logger.info("Start intantiating Models & Optimizers")
-    model = hydra.utils.instantiate(config.model)
+    model = hydra.utils.instantiate(config.model, checkpoint=model_ckpt)
 
     logger.info("Start instantiating dataloaders")
     dataloaders = erc.datasets.get_dataloaders(ds_cfg=config.dataset,
@@ -230,12 +235,27 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
                              modes=config.misc.modes)
     
     logger.info("Start instantiating Pytorch-Lightning Trainer")
+
+    # ckpt = config.module.load_from_checkpoint
+    # if ckpt:
+    #     logger.info("Load checkpoint from %s", ckpt)
+    #     _m = dict(config.module).pop("_target_").split(".")
+    #     _mc = importlib.import_module(".".join(_m[:-1]))
+    #     _mc = getattr(_mc, _m[-1])
+    #     module = _mc.load_from_checkpoint(ckpt,
+    #                                       model=model,
+    #                                       optimizer=config.optim,
+    #                                       scheduler=config.scheduler,
+    #                                       train_loader=dataloaders["train"],
+    #                                       valid_loader=dataloaders["valid"])
+    # else:
     module = hydra.utils.instantiate(config.module,
-                                      model=model,
-                                      optimizer=config.optim,
-                                      scheduler=config.scheduler,
-                                      train_loader=dataloaders["train"],
-                                      valid_loader=dataloaders["valid"])
+                                    model=model,
+                                    optimizer=config.optim,
+                                    scheduler=config.scheduler,
+                                    train_loader=dataloaders["train"],
+                                    valid_loader=dataloaders["valid"])
+
     return module, dataloaders
 
 
