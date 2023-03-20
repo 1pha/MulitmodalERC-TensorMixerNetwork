@@ -572,7 +572,7 @@ class HF_KEMD:
         ds_name = f"{paths}_{self.mode.value}{validation_fold}_multilabel{multilabel}_rdeuce{remove_deuce}"
         try:
             logger.info("Try Loading dataset %s from disk", ds_name)
-            self.ds = datasets.load_from_disk(ds_name)[:num_data]
+            self.ds = datasets.load_from_disk(ds_name)
             logger.info("Successfully loaded %s from disk", ds_name)
             logger.info("# Datapoints %s", len(self))
         except FileNotFoundError:

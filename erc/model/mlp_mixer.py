@@ -67,10 +67,10 @@ class MLP_Mixer(nn.Module):
         self.txt_model = BertForSequenceClassification.from_pretrained(config['txt']).bert
         if "lora" in config:
             logger.info("Train with Lora")
-            peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["wav"])
-            self.wav_model = get_peft_model(self.wav_model, peft_config)
-            peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["txt"])
-            self.txt_model = get_peft_model(self.txt_model, peft_config)
+            pcfg_wav = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["wav"])
+            self.wav_model = get_peft_model(self.wav_model, pcfg_wav)
+            pcfg_txt = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["txt"])
+            self.txt_model = get_peft_model(self.txt_model, pcfg_txt)
 
         self.mlp_mixer = MLPMixer(image_size=self.wav_model.config.classifier_proj_size,
                                   **config['mlp_mixer'])
@@ -127,7 +127,7 @@ class MLP_Mixer(nn.Module):
             # Multi label case
             cls_loss = self.criterions["cls"](cls_logits, cls_labels.float())
             if "vote_emotion" in labels:
-                cls_labels = kwargs["vote_emotion"]
+                cls_labels = labels["vote_emotion"]
             else:
                 cls_labels = cls_labels.argmax(dim=1)
         

@@ -10,6 +10,8 @@ load_from_cache_file: True
 num_proc: 8
 batched: True
 batch_size: 1000
+multilabel: True
+remove_deuce: False
 writer_batch_size: 1000
 num_data: False
 preprocess: True
