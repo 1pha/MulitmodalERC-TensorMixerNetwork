@@ -4,8 +4,14 @@ import torch
 from transformers import Wav2Vec2ForSequenceClassification, BertForSequenceClassification
 from torch import nn
 from einops.layers.torch import Rearrange, Reduce
+from peft import get_peft_model, LoraConfig, TaskType
 
 from erc.constants import Task
+import erc
+
+
+logger = erc.utils.get_logger(__name__)
+
 
 pair = lambda x: x if isinstance(x, tuple) else (x, x)
 
@@ -59,6 +65,13 @@ class MLP_Mixer(nn.Module):
         super().__init__()
         self.wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav']).wav2vec2
         self.txt_model = BertForSequenceClassification.from_pretrained(config['txt']).bert
+        if "lora" in config:
+            logger.info("Train with Lora")
+            peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["wav"])
+            self.wav_model = get_peft_model(self.wav_model, peft_config)
+            peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["txt"])
+            self.txt_model = get_peft_model(self.txt_model, peft_config)
+
         self.mlp_mixer = MLPMixer(image_size=self.wav_model.config.classifier_proj_size,
                                   **config['mlp_mixer'])
         self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, self.wav_model.config.classifier_proj_size)

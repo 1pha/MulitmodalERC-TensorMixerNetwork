@@ -9,6 +9,18 @@ config:
     dim: 512
     depth: 12
     num_classes: 9
+  lora:
+    wav:
+      target_modules: [ q_proj, v_proj ]
+      inference_mode: False
+      r: 8
+      lora_alpha: 32
+      lora_dropout: 0.1
+    txt: # klue/bert-base does not require target_modules
+      inference_mode: False
+      r: 8
+      lora_alpha: 32
+      lora_dropout: 0.1
 
 criterions:
   cls:
