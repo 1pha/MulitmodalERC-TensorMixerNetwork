@@ -60,25 +60,38 @@ class MLP_Mixer(nn.Module):
         config: str,
         criterions: torch.nn.Module,
         cls_coef: float = 0.5,
-        config_kwargs: dict = None
+        **config_kwargs
     ):
         super().__init__()
-        wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav'])
-        txt_model = BertForSequenceClassification.from_pretrained(config['txt'])
-        if "lora" in config:
-            logger.info("Train with Lora")
-            pcfg_wav = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["wav"])
-            self.wav_model = get_peft_model(wav_model, pcfg_wav).wav2vec2
-            pcfg_txt = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["txt"])
-            self.txt_model = get_peft_model(txt_model, pcfg_txt).bert
-        else:
-            self.wav_model = wav_model.wav2vec2
-            self.txt_model = txt_model.bert
-
+        self.wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav'])
+        self.txt_model = BertForSequenceClassification.from_pretrained(config['txt'])
         self.mlp_mixer = MLPMixer(image_size=self.wav_model.config.classifier_proj_size,
                                   **config['mlp_mixer'])
         self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, self.wav_model.config.classifier_proj_size)
         self.txt_projector = nn.Linear(768, self.wav_model.config.classifier_proj_size)
+        if config_kwargs.get("checkpoint"):
+            for name, param in self.state_dict().items():
+                if param.requires_grad:
+                    print(name)
+            logger.info("Load from checkpoint")
+            def parser(k):
+                _k = k.split(".")[1:]
+                if _k[0] == "wav_model" and _k[1] != "classifier":
+                    _k.insert(1, "wav2vec2")
+                elif _k[0] == "txt_model" and _k[1] != "classifier":
+                    _k.insert(1, "bert")
+                return ".".join(_k)
+            ckpt = {parser(k): v for k, v in config_kwargs["checkpoint"].items()}
+            self.load_state_dict(ckpt, strict=False)
+        if "lora" in config:
+            logger.info("Train with Lora")
+            pcfg_wav = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["wav"])
+            self.wav_model = get_peft_model(self.wav_model, pcfg_wav).wav2vec2
+            pcfg_txt = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["txt"])
+            self.txt_model = get_peft_model(self.txt_model, pcfg_txt).bert
+        else:
+            self.wav_model = self.wav_model.wav2vec2
+            self.txt_model = self.txt_model.bert
 
         self.criterions = criterions
         if not (0 < cls_coef < 1):

@@ -194,8 +194,15 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     logger.info("Start Setting up")
     erc.utils._seed_everything(config.misc.seed)
 
+    ckpt = config.module.load_from_checkpoint
+    if ckpt:
+        ckpt = torch.load(ckpt)
+        model_ckpt = ckpt.pop("state_dict")
+    else:
+        model_ckpt = None
+
     logger.info("Start intantiating Models & Optimizers")
-    model = hydra.utils.instantiate(config.model)
+    model = hydra.utils.instantiate(config.model, checkpoint=model_ckpt)
 
     logger.info("Start instantiating dataloaders")
     dataloaders = erc.datasets.get_dataloaders(ds_cfg=config.dataset,
@@ -204,25 +211,25 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
     
     logger.info("Start instantiating Pytorch-Lightning Trainer")
 
-    ckpt = config.module.load_from_checkpoint
-    if ckpt:
-        logger.info("Load checkpoint from %s", ckpt)
-        _m = dict(config.module).pop("_target_").split(".")
-        _mc = importlib.import_module(".".join(_m[:-1]))
-        _mc = getattr(_mc, _m[-1])
-        module = _mc.load_from_checkpoint(ckpt,
-                                          model=model,
-                                          optimizer=config.optim,
-                                          scheduler=config.scheduler,
-                                          train_loader=dataloaders["train"],
-                                          valid_loader=dataloaders["valid"])
-    else:
-        module = hydra.utils.instantiate(config.module,
-                                        model=model,
-                                        optimizer=config.optim,
-                                        scheduler=config.scheduler,
-                                        train_loader=dataloaders["train"],
-                                        valid_loader=dataloaders["valid"])
+    # ckpt = config.module.load_from_checkpoint
+    # if ckpt:
+    #     logger.info("Load checkpoint from %s", ckpt)
+    #     _m = dict(config.module).pop("_target_").split(".")
+    #     _mc = importlib.import_module(".".join(_m[:-1]))
+    #     _mc = getattr(_mc, _m[-1])
+    #     module = _mc.load_from_checkpoint(ckpt,
+    #                                       model=model,
+    #                                       optimizer=config.optim,
+    #                                       scheduler=config.scheduler,
+    #                                       train_loader=dataloaders["train"],
+    #                                       valid_loader=dataloaders["valid"])
+    # else:
+    module = hydra.utils.instantiate(config.module,
+                                    model=model,
+                                    optimizer=config.optim,
+                                    scheduler=config.scheduler,
+                                    train_loader=dataloaders["train"],
+                                    valid_loader=dataloaders["valid"])
 
     return module, dataloaders
 

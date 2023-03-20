@@ -35,7 +35,7 @@ module:
     wav_model: 1e-5
     txt_model: 1e-5
     mlp_mixer: 1e-4
-  load_from_checkpoint: weights_AI_HUB/30752-valid_acc0.997.ckpt
+  load_from_checkpoint:
   
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
