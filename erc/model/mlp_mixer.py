@@ -75,10 +75,12 @@ class MLP_Mixer(nn.Module):
             self.wav_model = wav_model.wav2vec2
             self.txt_model = txt_model.bert
 
-        self.mlp_mixer = MLPMixer(image_size=self.wav_model.config.classifier_proj_size,
+        proj_size = self.wav_model.config.classifier_proj_size
+        self.mlp_mixer = MLPMixer(image_size=proj_size,
                                   **config['mlp_mixer'])
-        self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, self.wav_model.config.classifier_proj_size)
-        self.txt_projector = nn.Linear(768, self.wav_model.config.classifier_proj_size)
+        self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, proj_size)
+        self.txt_projector = nn.Linear(768, proj_size)
+        self.gender_embed = nn.Embedding(num_embeddings=2, embedding_dim=proj_size)
 
         self.criterions = criterions
         if not (0 < cls_coef < 1):
@@ -93,6 +95,7 @@ class MLP_Mixer(nn.Module):
         txt: torch.Tensor,
         txt_mask: torch.Tensor,
         labels: torch.Tensor = None,
+        gender: torch.Tensor = None,
         **kwargs
     ) -> dict:
         """ Size
@@ -116,6 +119,10 @@ class MLP_Mixer(nn.Module):
         txt_outputs = self.txt_model(input_ids=txt, attention_mask=txt_mask)[1] # (B, BERT_hidden_dim)
         pooled_txt_output = self.txt_projector(txt_outputs) # (B, BERT_proj_size)
 
+        if gender is not None:
+            gender_embed = self.gender_embed(gender)
+            pooled_wav_output = pooled_wav_output + gender_embed
+
         # (B, 1 , WAV_proj_size, BERT_proj_size)
         matmul_output = torch.bmm(pooled_wav_output.unsqueeze(2), pooled_txt_output.unsqueeze(1)).unsqueeze(1)
         logits = self.mlp_mixer(matmul_output) # (B, num_labels)
@@ -129,10 +136,10 @@ class MLP_Mixer(nn.Module):
         elif cls_labels.ndim == 2:
             # Multi label case
             cls_loss = self.criterions["cls"](cls_logits, cls_labels.float())
-            if "vote_emotion" in labels:
-                cls_labels = labels["vote_emotion"]
-            else:
-                cls_labels = cls_labels.argmax(dim=1)
+            # if "vote_emotion" in labels:
+            #     cls_labels = labels["vote_emotion"]
+            # else:
+            # cls_labels = cls_labels.argmax(dim=1)
         
         reg_logits = logits[:, -2:]
         reg_loss = self.criterions["reg"](reg_logits, labels["regress"].float())
