@@ -7,7 +7,7 @@ hydra:
 defaults:
   - _self_
   - dataset: hf
-  - model: combined
+  - model: mlp_mixer
   - scheduler: cosine_warmup
 
 dataloader:

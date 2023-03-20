@@ -1,7 +1,6 @@
 import os
 import random 
 
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Tuple
 from glob import glob 
@@ -16,9 +15,16 @@ from torch.utils.data import Dataset
 import torchaudio
 from transformers import AutoProcessor, AutoTokenizer
 
-from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20, run_generate_datasets
+from erc.preprocess import get_folds, merge_csv_kemdy19, merge_csv_kemdy20
 from erc.utils import check_exists, get_logger
-from erc.constants import RunMode, emotion2idx, gender2idx
+from erc.constants import (
+    RunMode,
+    emotion2idx,
+    gender2idx,
+    emotion_va_19_dict,
+    emotion_va_20_dict,
+    emotion_va_19_20_dict
+)
 
 random.seed(42)
 
@@ -37,6 +43,7 @@ class KEMDBase(Dataset):
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
         multilabel: bool = False,
+        remove_deuce: bool = False,
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
@@ -72,6 +79,7 @@ class KEMDBase(Dataset):
         self.max_length_txt = max_length_txt
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name) if tokenizer_name else None
         self.multilabel = multilabel
+        self.remove_deuce = remove_deuce
         emo_col = list(emotion2idx.keys())
         emo_col.remove("disqust")
         self.emo_col = emo_col if multilabel else "emotion"
@@ -158,6 +166,10 @@ class KEMDBase(Dataset):
         data["valence"] = torch.tensor(valence, dtype=torch.float)
         data["arousal"] = torch.tensor(arousal, dtype=torch.float)
 
+        # Vote Emotion
+        if self.multilabel:
+            data["vote_emotion"] = self.get_hard_vote(data=data)
+
         # Man-Female
         data["gender"] = self.gender2num(gender) # Sess01_script01_F003
         return data
@@ -223,33 +235,67 @@ class KEMDBase(Dataset):
             return input_ids, mask
         else:
             return txt, None
+        
+    def get_hard_vote(self, data: dict) -> torch.Tensor:
+        e = data["emotion"]
+        v = data["valence"]
+        a = data["arousal"]
+        
+        m = e == e.max()
+        if len(e[m]) > 1:
+            regress = torch.stack([v, a]).numpy()
+            ve = self._find_deuce_label(regress=regress, mask=m)
+        else:
+            ve = torch.tensor(e.argmax())
+        return ve
+    
+    def _find_deuce_label(self, regress: np.ndarray, mask: np.ndarray) -> torch.Tensor:
+        '''
+        Summary:
+            동률인 것 중 거리가 가장 작은 것을 사용하여 라벨을 확정한다. 
+        Input
+        regress = np.array([valence, arousal])
+        deuce_mask = np.array([False,  True, False,  True, False, False, False])
+        Return
+            voted index 
+        '''
+        mask = mask.nonzero()[0]
+        total_dist = []
+        eva_dict = {
+            "kemdy19": emotion_va_19_dict,
+            "kemdy20": emotion_va_20_dict,
+        }[self.NAME.lower()]
+        for index in mask:
+            center = np.array(eva_dict[f'{index}_centroid'])
+            dist = np.linalg.norm(regress - center, ord=2)
+            total_dist.append(dist)
+        return torch.tensor(mask[np.array(total_dist).argmin()]) # select minumum value index
 
     def processed_db(self, generate_csv: bool = False, fold_num: int = 4) -> pd.DataFrame:
         """ Reads in .csv file if exists.
         If pre-processed .csv file does NOT exists, read from data path. """
         if not os.path.exists(self.TOTAL_DF_PATH) or generate_csv:
             logger.info(f"{self.TOTAL_DF_PATH} does not exists. Process from raw data")
-            total_df = self.merge_csv(base_path=self.base_path, save_path=self.TOTAL_DF_PATH)
+            total_df = self.merge_csv(base_path=self.base_path,
+                                      save_path=self.TOTAL_DF_PATH,
+                                      exclude_multilabel=not self.multilabel)
         else:
             try:
                 total_df = pd.read_csv(self.TOTAL_DF_PATH)
                 if self.multilabel:
+                    # Check if multilabel data has seven extra columns
                     if not set(self.emo_col) & set(total_df.columns):
                         total_df = self.merge_csv(base_path=self.base_path,
                                                   save_path=self.TOTAL_DF_PATH,
                                                   exclude_multilabel=False)
-                else:
-                    if total_df[self.emo_col].apply(lambda s: ";" in s).sum():
-                        # Multilabel should NOT be contained
-                        total_df = self.merge_csv(base_path=self.base_path,
-                                                  save_path=self.TOTAL_DF_PATH,
-                                                  exclude_multilabel=True)
             except pd.errors.EmptyDataError as e:
                 logger.error(f"{self.TOTAL_DF_PATH} seems to be empty")
                 logger.exception(e)
                 total_df = None
         
         df = self.split_folds(total_df=total_df, fold_num=fold_num, mode=self.mode)
+        if self.remove_deuce:
+            df = df[~df['emotion'].str.contains(';')]
         return df
     
     def split_folds(
@@ -323,6 +369,7 @@ class KEMDy19Dataset(KEMDBase):
         max_length_txt: int = 50,
         tokenizer_name: str = None,
         multilabel: bool = False,
+        remove_deuce: bool = True,
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
@@ -336,6 +383,7 @@ class KEMDy19Dataset(KEMDBase):
             max_length_txt,
             tokenizer_name,
             multilabel,
+            remove_deuce,
             validation_fold,
             mode,
             num_data,
@@ -381,6 +429,7 @@ class KEMDy20Dataset(KEMDBase):
         max_length_txt: int = 50,
         tokenizer_name: str = None,
         multilabel: bool = False,
+        remove_deuce: bool = True,
         validation_fold: int = 4,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
@@ -394,6 +443,7 @@ class KEMDy20Dataset(KEMDBase):
             max_length_txt,
             tokenizer_name,
             multilabel,
+            remove_deuce,
             validation_fold,
             mode,
             num_data,
@@ -448,6 +498,7 @@ class KEMDDataset(Dataset):
         max_length_txt: int = 50,
         tokenizer_name: str = "klue/bert-base",
         multilabel: bool = False,
+        remove_deuce: bool = True,
         mode: RunMode | str = RunMode.TRAIN,
         num_data: int = None,
     ):
@@ -457,6 +508,7 @@ class KEMDDataset(Dataset):
                                       max_length_txt=max_length_txt,
                                       tokenizer_name=tokenizer_name,
                                       multilabel=multilabel,
+                                      remove_deuce=remove_deuce,
                                       validation_fold=validation_fold,
                                       mode=mode,
                                       num_data=num_data)
@@ -465,6 +517,7 @@ class KEMDDataset(Dataset):
                                       max_length_txt=max_length_txt,
                                       tokenizer_name=tokenizer_name,
                                       multilabel=multilabel,
+                                      remove_deuce=remove_deuce,
                                       validation_fold=validation_fold,
                                       mode=mode,
                                       num_data=num_data)
@@ -492,6 +545,7 @@ class HF_KEMD:
         txt_processor: str = "klue/bert-base",
         txt_max_length: int = 64,
         multilabel: bool = False,
+        remove_deuce: bool = True,
         load_from_cache_file: bool = True,
         num_proc: int = 8,
         batched: bool = True,
@@ -515,11 +569,12 @@ class HF_KEMD:
         logger.info("Load %s Huggingface KEMD Dataset", mode)
         self.mode = RunMode[mode.upper()] if isinstance(mode, str) else mode
 
-        ds_name = f"{paths}_{self.mode.value}{validation_fold}"
+        ds_name = f"{paths}_{self.mode.value}{validation_fold}_multilabel{multilabel}_rdeuce{remove_deuce}"
         try:
             logger.info("Try Loading dataset %s from disk", ds_name)
             self.ds = datasets.load_from_disk(ds_name)
             logger.info("Successfully loaded %s from disk", ds_name)
+            logger.info("# Datapoints %s", len(self))
         except FileNotFoundError:
             if os.path.exists(ds_name):
                 logger.warn("Was not able to load %s. Please check dataset path", ds_name)
@@ -538,6 +593,7 @@ class HF_KEMD:
                 max_length_wav=wav_max_length,
                 max_length_txt=txt_max_length,
                 multilabel=multilabel,
+                remove_deuce=remove_deuce,
                 validation_fold=validation_fold,
                 mode=mode,
                 num_data=num_data,
@@ -617,11 +673,15 @@ class HF_KEMD:
             "kemdy20": KEMDy20Dataset,
             "aihub": AIHubDialog,
         }[path](**kwargs)
+        logger.info("%s dataset has %s data", path, len(ds))
+        logger.info("Sample data %s", ds[0])
         return ds
 
     def load_dataset(self, paths, **kwargs):
         try:
             paths = paths.split("-")
+            logger.info("Loading PyTorch dataset.")
+            logger.info("config: %s", kwargs)
             ds = torch.utils.data.ConcatDataset(
                 [self._load_dataset(path, **kwargs) for path in paths]
             )
@@ -652,7 +712,6 @@ class AIHubDialog(KEMDBase):
         self.txt_folder = self.get_sub_list(self.txt_folder_total, index_list)
         self.wav_folder = self.get_sub_list(self.wav_folder_total, index_list)
         
-
     def __len__(self):
         assert len(self.wav_folder) == len(self.txt_folder)
         return len(self.wav_folder) 

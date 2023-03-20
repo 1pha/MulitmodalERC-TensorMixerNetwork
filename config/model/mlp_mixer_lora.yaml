@@ -1,0 +1,30 @@
+_target_: erc.model.mlp_mixer.MLP_Mixer
+config: 
+  wav: kresnik/wav2vec2-large-xlsr-korean
+  txt: klue/bert-base
+  mlp_mixer: 
+    # image_size: [ 1024, 768 ]
+    channels: 1
+    patch_size: 16
+    dim: 512
+    depth: 12
+    num_classes: 9
+  lora:
+    wav:
+      target_modules: [ q_proj, v_proj ]
+      inference_mode: False
+      r: 8
+      lora_alpha: 32
+      lora_dropout: 0.1
+    txt: # klue/bert-base does not require target_modules
+      inference_mode: False
+      r: 8
+      lora_alpha: 32
+      lora_dropout: 0.1
+
+criterions:
+  cls:
+    _target_: torch.nn.CrossEntropyLoss
+  reg:
+    _target_: torch.nn.MSELoss
+cls_coef: 0.7

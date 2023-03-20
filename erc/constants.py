@@ -71,7 +71,7 @@ columns_kemdy20 = OrderedDict({
     6: "arousal",
 })
 
-# emotion = (Valence ,Arousal)
+# emotion = (Valence, Arousal)
 emotion_va_19_20_dict = {
     '0_centroid': (2.7013428, 3.6017902),
     '1_centroid': (1.8056872, 3.5810425),
