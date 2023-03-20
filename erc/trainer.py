@@ -98,6 +98,7 @@ class ERCModule(pl.LightningModule):
             labels = {
                 "emotion": batch["emotion"],
                 "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1),
+                "vote_emotion": batch["vote_emotion"]
             }
         # TODO: Add Multilabel Fetch
         return labels

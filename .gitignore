@@ -1,8 +1,12 @@
 data/
 outputs/
 lightning_logs/
-kemdy19/
-kemdy20/
+kemdy19_train4/
+kemdy19_valid4/
+kemdy20_train4/
+kemdy20_valid4/
+kemdy19-kemdy20_train4/
+kemdy19-kemdy20_valid4/
 
 # Wandb directoriees
 wandb/
@@ -139,7 +143,13 @@ dmypy.json
 .pyre/
 
 # audio_dataset
+aihub/
 audio_dataset_19/
 wav2vec2-xlsr-speech-emotion-classification/
 aihub_train4/
 aihub_valid4/
+
+# except jupyter notebook 
+modeling.ipynb
+hoesung_example.ipynb
+weights_AI_HUB/

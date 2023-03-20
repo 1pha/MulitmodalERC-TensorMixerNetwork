@@ -4,8 +4,14 @@ import torch
 from transformers import Wav2Vec2ForSequenceClassification, BertForSequenceClassification
 from torch import nn
 from einops.layers.torch import Rearrange, Reduce
+from peft import get_peft_model, LoraConfig, TaskType
 
 from erc.constants import Task
+import erc
+
+
+logger = erc.utils.get_logger(__name__)
+
 
 pair = lambda x: x if isinstance(x, tuple) else (x, x)
 
@@ -57,8 +63,18 @@ class MLP_Mixer(nn.Module):
         config_kwargs: dict = None
     ):
         super().__init__()
-        self.wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav']).wav2vec2
-        self.txt_model = BertForSequenceClassification.from_pretrained(config['txt']).bert
+        wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav'])
+        txt_model = BertForSequenceClassification.from_pretrained(config['txt'])
+        if "lora" in config:
+            logger.info("Train with Lora")
+            pcfg_wav = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["wav"])
+            self.wav_model = get_peft_model(wav_model, pcfg_wav).wav2vec2
+            pcfg_txt = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["txt"])
+            self.txt_model = get_peft_model(txt_model, pcfg_txt).bert
+        else:
+            self.wav_model = wav_model.wav2vec2
+            self.txt_model = txt_model.bert
+
         self.mlp_mixer = MLPMixer(image_size=self.wav_model.config.classifier_proj_size,
                                   **config['mlp_mixer'])
         self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, self.wav_model.config.classifier_proj_size)
@@ -113,7 +129,10 @@ class MLP_Mixer(nn.Module):
         elif cls_labels.ndim == 2:
             # Multi label case
             cls_loss = self.criterions["cls"](cls_logits, cls_labels.float())
-            cls_labels = cls_labels.argmax(dim=1)
+            if "vote_emotion" in labels:
+                cls_labels = labels["vote_emotion"]
+            else:
+                cls_labels = cls_labels.argmax(dim=1)
         
         reg_logits = logits[:, -2:]
         reg_loss = self.criterions["reg"](reg_logits, labels["regress"].float())
