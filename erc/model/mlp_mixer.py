@@ -63,14 +63,17 @@ class MLP_Mixer(nn.Module):
         config_kwargs: dict = None
     ):
         super().__init__()
-        self.wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav']).wav2vec2
-        self.txt_model = BertForSequenceClassification.from_pretrained(config['txt']).bert
+        wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav'])
+        txt_model = BertForSequenceClassification.from_pretrained(config['txt'])
         if "lora" in config:
             logger.info("Train with Lora")
             pcfg_wav = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["wav"])
-            self.wav_model = get_peft_model(self.wav_model, pcfg_wav)
+            self.wav_model = get_peft_model(wav_model, pcfg_wav).wav2vec2
             pcfg_txt = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["txt"])
-            self.txt_model = get_peft_model(self.txt_model, pcfg_txt)
+            self.txt_model = get_peft_model(txt_model, pcfg_txt).bert
+        else:
+            self.wav_model = wav_model.wav2vec2
+            self.txt_model = txt_model.bert
 
         self.mlp_mixer = MLPMixer(image_size=self.wav_model.config.classifier_proj_size,
                                   **config['mlp_mixer'])
