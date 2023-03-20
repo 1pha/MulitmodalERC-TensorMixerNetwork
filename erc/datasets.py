@@ -314,7 +314,7 @@ class KEMDBase(Dataset):
             loc = ~sessions.isin(fold_range) if mode == RunMode.TRAIN else sessions.isin(fold_range)
             return total_df.loc[loc]
         
-    def get_emo(self, emotion: str | pd.Series) -> str | np.ndarray:
+    def get_emo(self, emotion: str | pd.Series) -> int | np.ndarray:
         if isinstance(emotion, str):
             # Single label cases
             return self.str2num(emotion)
@@ -692,9 +692,17 @@ class HF_KEMD:
 
 
 class AIHubDialog(KEMDBase):
+    '''
+    With this class, we can split just one-fold of subset in AI-Hub dataset.
+    Also, there are no arousal, valence score in the ai-hub dataset i.e. only can interprete txt, wav 
+    '''
     NAME = "AIHubDialog"
     # PRETRAINED_DATA_PATH = '/home/hoesungryu/workspace/AI-Hub_emotion_dialog'
-    def __init__(self, PRETRAINED_DATA_PATH, mode, **kwargs):
+    def __init__(
+            self, 
+            PRETRAINED_DATA_PATH: str | Path,
+            mode : str,
+            **kwargs):
         self.txt_folder_total = sorted(glob(os.path.join(PRETRAINED_DATA_PATH, 'annotation')+'/*.csv'))
         self.wav_folder_total = sorted(glob(os.path.join(PRETRAINED_DATA_PATH, 'wav')+'/*.wav'))
         self.max_length_wav = None
@@ -725,11 +733,17 @@ class AIHubDialog(KEMDBase):
         data["wav"] = wav
         data["wav_mask"] = wav_mask
 
+        # Arousal / Valence ;
+        data["arousal"] = 0
+        data["valence"] = 0
+
         return data
 
     @staticmethod
-    def sampling_with_ratio(total_len : int, mode : str, train_ratio = 0.8):
-
+    def sampling_with_ratio(total_len : int, mode : str, train_ratio = 0.8) -> list[int]:
+        '''
+            Using Numpy sample, we split the train valid with train_ratio
+        '''
         total_idx = [i for i in range(total_len)]
         train_num = int(total_len * train_ratio)
 
