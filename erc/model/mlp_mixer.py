@@ -72,6 +72,9 @@ class MLP_Mixer(nn.Module):
         self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, proj_size)
         self.txt_projector = nn.Linear(768, proj_size)
         self.gender_embed = nn.Embedding(num_embeddings=2, embedding_dim=proj_size)
+        self.use_gender = config_kwargs.get("use_gender", False)
+        self.wav_gender = config_kwargs.get("wav_gender", False)
+        self.txt_gender = config_kwargs.get("txt_gender", False)
         if config_kwargs.get("checkpoint"):
             for name, param in self.state_dict().items():
                 if param.requires_grad:
@@ -134,8 +137,12 @@ class MLP_Mixer(nn.Module):
         pooled_txt_output = self.txt_projector(txt_outputs) # (B, BERT_proj_size)
 
         if gender is not None:
-            gender_embed = self.gender_embed(gender)
-            pooled_wav_output = pooled_wav_output + gender_embed
+            if self.use_gender:
+                gender_embed = self.gender_embed(gender)
+                if self.wav_gender:
+                    pooled_wav_output = pooled_wav_output + gender_embed
+                if self.txt_gender:
+                    pooled_txt_output = pooled_txt_output + gender_embed
 
         # (B, 1 , WAV_proj_size, BERT_proj_size)
         matmul_output = torch.bmm(pooled_wav_output.unsqueeze(2), pooled_txt_output.unsqueeze(1)).unsqueeze(1)
@@ -185,6 +192,9 @@ class MLP_Mixer_Roberta(nn.Module):
         self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, proj_size)
         self.txt_projector = nn.Linear(768, proj_size)
         self.gender_embed = nn.Embedding(num_embeddings=2, embedding_dim=proj_size)
+        self.use_gender = config_kwargs.get("use_gender", False)
+        self.wav_gender = config_kwargs.get("wav_gender", False)
+        self.txt_gender = config_kwargs.get("txt_gender", False)
         if config_kwargs.get("checkpoint"):
             for name, param in self.state_dict().items():
                 if param.requires_grad:
@@ -247,8 +257,12 @@ class MLP_Mixer_Roberta(nn.Module):
         pooled_txt_output = self.txt_projector(txt_outputs) # (B, BERT_proj_size)
 
         if gender is not None:
-            gender_embed = self.gender_embed(gender)
-            pooled_wav_output = pooled_wav_output + gender_embed
+            if self.use_gender:
+                gender_embed = self.gender_embed(gender)
+                if self.wav_gender:
+                    pooled_wav_output = pooled_wav_output + gender_embed
+                if self.txt_gender:
+                    pooled_txt_output = pooled_txt_output + gender_embed
 
         # (B, 1 , WAV_proj_size, BERT_proj_size)
         matmul_output = torch.bmm(pooled_wav_output.unsqueeze(2), pooled_txt_output.unsqueeze(1)).unsqueeze(1)
