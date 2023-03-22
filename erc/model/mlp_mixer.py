@@ -75,6 +75,7 @@ class MLP_Mixer(nn.Module):
         self.use_gender = config_kwargs.get("use_gender", False)
         self.wav_gender = config_kwargs.get("wav_gender", False)
         self.txt_gender = config_kwargs.get("txt_gender", False)
+        self.use_matthew = config_kwargs.get("use_matthew", False)
         if config_kwargs.get("checkpoint"):
             for name, param in self.state_dict().items():
                 if param.requires_grad:
@@ -156,6 +157,8 @@ class MLP_Mixer(nn.Module):
             cls_loss = self.criterions["cls"](cls_logits, cls_labels.long())
         elif cls_labels.ndim == 2:
             # Multi label case
+            if self.use_matthew:
+                cls_labels = erc.utils.reverse_soft(y_soft=cls_labels)
             cls_loss = self.criterions["cls"](cls_logits, cls_labels.float())
         
         reg_logits = logits[:, -2:]
