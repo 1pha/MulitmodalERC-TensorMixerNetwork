@@ -63,8 +63,6 @@ class ERCModule(pl.LightningModule):
         self.ccc_aro = ConcordanceCorrCoef(num_outputs=1)
 
         self.label_keys = list(erc.constants.emotion2idx.keys())[:-1]
-        # TODO: Look-up what to save
-        self.save_hyperparameters(ignore=["model"])
 
     def train_dataloader(self):
         return self.train_loader
@@ -96,7 +94,7 @@ class ERCModule(pl.LightningModule):
             labels = {
                 "emotion": batch["emotion"],
                 "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1),
-                "vote_emotion": batch["vote_emotion"]
+                "vote_emotion": batch.get("vote_emotion", None)
             }
         # TODO: Add Multilabel Fetch
         return labels
@@ -108,7 +106,8 @@ class ERCModule(pl.LightningModule):
                                       wav_mask=batch["wav_mask"],
                                       txt=batch["txt"],
                                       txt_mask=batch["txt_mask"],
-                                      labels=labels)
+                                      labels=labels,
+                                      gender=batch.get("gender", None))
             return result
         except RuntimeError:
             # For CUDA Device-side asserted error
@@ -132,7 +131,29 @@ class ERCModule(pl.LightningModule):
             logger.warn("Error provoking data %s", outputs)
             breakpoint()
         return result
-    
+
+    def remove_deuce(self, outputs: dict) -> dict:
+        """ Find deuced emotions and remove from batch """
+        result = outputs
+        emotion = outputs["emotion"]
+        if emotion.ndim == 2:
+            # For multi-dimensional emotion cases
+            _, num_class = emotion.shape
+            v, _ = emotion.max(dim=1)
+            v = v.unsqueeze(dim=1).repeat(1, num_class)
+            um = (emotion == v).sum(dim=1) == 1 # (bsz, ), unique mask
+            if (um.sum() == 0).item():
+                # If every batches had deuce data
+                result = {k: _v[um] for k, _v in outputs.items() if _v.ndim > 0}
+            else:
+                result.update(
+                    {k: _v[um] for k, _v in outputs.items() if _v.ndim > 0}
+                )
+                result["emotion"] = result["emotion"].argmax(dim=1)
+            return result
+        else:
+            return result
+
     def log_result(
         self, 
         outputs: List[Dict] | dict, 
@@ -140,6 +161,7 @@ class ERCModule(pl.LightningModule):
         unit: str = "epoch"
     ):
         result: dict = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
+        result = self.remove_deuce(outputs=result)
         # Log Losses
         for loss_key in ["loss", "cls_loss", "reg_loss"]:
             if loss_key in result:
@@ -150,26 +172,27 @@ class ERCModule(pl.LightningModule):
             self.acc(preds=result["cls_pred"], target=result["emotion"])
             self.auroc(preds=result["cls_pred"], target=result["emotion"])
             self.f1(preds=result["cls_pred"], target=result["emotion"])
-        self.log(f'{unit}/{mode}_acc', self.acc)
-        self.log(f'{unit}/{mode}_auroc', self.auroc)
-        self.log(f'{unit}/{mode}_f1', self.f1)
+            self.log(f'{unit}/{mode}_acc', self.acc)
+            self.log(f'{unit}/{mode}_auroc', self.auroc)
+            self.log(f'{unit}/{mode}_f1', self.f1)
 
         # Log Regression Metrics: CCC
         if "reg_pred" in result and "regress" in result:
             self.ccc_val(result["reg_pred"][:, 0], result["regress"][:, 0])
             self.ccc_aro(result["reg_pred"][:, 1], result["regress"][:, 1])
-        self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val)
-        self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro)
+            self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val)
+            self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro)
         return result
         
     def log_confusion_matrix(self, result: dict):
-        preds = result["cls_pred"].cpu().detach()
-        preds = preds.argmax(dim=1).numpy()
-        labels = result["emotion"].cpu().numpy()
-        cf = wandb.plot.confusion_matrix(y_true=labels,
-                                         preds=preds,
-                                         class_names=self.label_keys)
-        self.logger.experiment.log({"confusion_matrix": cf})
+        preds = result["cls_pred"].cpu().detach() if "cls_pred" in result else None
+        labels = result["emotion"].cpu().numpy() if "emotion" in result else None
+        if preds is not None and labels is not None:
+            preds = preds.argmax(dim=1).numpy()
+            cf = wandb.plot.confusion_matrix(y_true=labels,
+                                            preds=preds,
+                                            class_names=self.label_keys)
+            self.logger.experiment.log({"confusion_matrix": cf})
 
     def training_step(self, batch, batch_idx, optimizer_idx=None):
         result = self.forward(batch)
@@ -178,7 +201,6 @@ class ERCModule(pl.LightningModule):
 
     def training_epoch_end(self, outputs: List[Dict]):
         result = self.log_result(outputs=outputs, mode="train", unit="epoch")
-        self.log_confusion_matrix(result)
 
     def validation_step(self, batch, batch_idx):
         result = self.forward(batch)
