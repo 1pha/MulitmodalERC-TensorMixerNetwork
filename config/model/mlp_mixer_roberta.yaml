@@ -1,4 +1,4 @@
-_target_: erc.model.mlp_mixer.MLP_Mixer
+_target_: erc.model.mlp_mixer.MLP_Mixer_Roberta
 config: 
   wav: kresnik/wav2vec2-large-xlsr-korean
   txt: klue/roberta-base

@@ -64,7 +64,7 @@ class MLP_Mixer(nn.Module):
     ):
         super().__init__()
         self.wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav'])
-        self.txt_model = RobertaForSequenceClassification.from_pretrained(config['txt'])
+        self.txt_model = BertForSequenceClassification.from_pretrained(config['txt'])
 
         proj_size = self.wav_model.config.classifier_proj_size
         self.mlp_mixer = MLPMixer(image_size=proj_size,
@@ -96,7 +96,7 @@ class MLP_Mixer(nn.Module):
             pcfg_txt = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["txt"])
             self.txt_model = get_peft_model(self.txt_model, pcfg_txt)
         self.wav_model = self.wav_model.wav2vec2
-        self.txt_model = self.txt_model.roberta
+        self.txt_model = self.txt_model.bert
 
         self.criterions = criterions
         if not (0 < cls_coef < 1):
@@ -184,13 +184,16 @@ class MLP_Mixer_Roberta(nn.Module):
     ):
         super().__init__()
         self.wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav'])
-        self.txt_model = BertForSequenceClassification.from_pretrained(config['txt'])
+        self.txt_model = RobertaForSequenceClassification.from_pretrained(config['txt'])
 
         proj_size = self.wav_model.config.classifier_proj_size
         self.mlp_mixer = MLPMixer(image_size=proj_size,
                                   **config['mlp_mixer'])
         self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, proj_size)
-        self.txt_projector = nn.Linear(768, proj_size)
+        last_hdn_size = {
+            "klue/roberta-base": 768, "klue/roberta-large": 1024
+        }[config["txt"]]
+        self.txt_projector = nn.Linear(last_hdn_size, proj_size)
         self.gender_embed = nn.Embedding(num_embeddings=2, embedding_dim=proj_size)
         self.use_gender = config_kwargs.get("use_gender", False)
         self.wav_gender = config_kwargs.get("wav_gender", False)
@@ -216,7 +219,7 @@ class MLP_Mixer_Roberta(nn.Module):
             pcfg_txt = LoraConfig(task_type=TaskType.SEQ_CLS, **config["lora"]["txt"])
             self.txt_model = get_peft_model(self.txt_model, pcfg_txt)
         self.wav_model = self.wav_model.wav2vec2
-        self.txt_model = self.txt_model.bert
+        self.txt_model = self.txt_model.roberta
 
         self.criterions = criterions
         if not (0 < cls_coef < 1):
@@ -252,9 +255,9 @@ class MLP_Mixer_Roberta(nn.Module):
             pooled_wav_output = hidden_states.sum(dim=1) / padding_mask.sum(dim=1).view(-1, 1)
 
         # TXT 
-        breakpoint()
-        txt_outputs = self.txt_model(input_ids=txt, attention_mask=txt_mask)[1] # (B, BERT_hidden_dim)
-        pooled_txt_output = self.txt_projector(txt_outputs) # (B, BERT_proj_size)
+        txt_last_hidden_state = self.txt_model(input_ids=txt, attention_mask=txt_mask)[0] # (B, RoBERTa_hidden_dim)
+        txt_outputs = txt_last_hidden_state[:, 0, :]
+        pooled_txt_output = self.txt_projector(txt_outputs) # (B, RoBERTa_proj_size)
 
         if gender is not None:
             if self.use_gender:

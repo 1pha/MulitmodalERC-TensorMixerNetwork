@@ -63,8 +63,6 @@ class ERCModule(pl.LightningModule):
         self.ccc_aro = ConcordanceCorrCoef(num_outputs=1)
 
         self.label_keys = list(erc.constants.emotion2idx.keys())[:-1]
-        # TODO: Look-up what to save
-        self.save_hyperparameters(ignore=["model"])
 
     def train_dataloader(self):
         return self.train_loader
@@ -96,7 +94,7 @@ class ERCModule(pl.LightningModule):
             labels = {
                 "emotion": batch["emotion"],
                 "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1),
-                "vote_emotion": batch["vote_emotion"]
+                "vote_emotion": batch.get("vote_emotion", None)
             }
         # TODO: Add Multilabel Fetch
         return labels
