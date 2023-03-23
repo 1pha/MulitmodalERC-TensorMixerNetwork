@@ -45,7 +45,7 @@ def _seed_everything(seed):
     #  max_pool3d_with_indices_backward_cuda does not have a deterministic implementation
     torch.backends.cudnn.benchmark = False
 
-def reverse_soft(
+def apply_peakl(
         y_soft : torch.Tensor,
         r: int = 0.3
     ) -> torch.Tensor:
