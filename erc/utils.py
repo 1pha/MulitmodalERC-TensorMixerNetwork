@@ -47,18 +47,26 @@ def _seed_everything(seed):
 
 def apply_peakl(
         y_soft : torch.Tensor,
-        r: int = 0.3
+        r: int = 0.4
     ) -> torch.Tensor:
     """
         We build our own hard labeling function 
         idea source1: https://arxiv.org/pdf/1512.00567.pdf
         idea source2: https://proceedings.mlr.press/v162/wei22b/wei22b.pdf#page=11&zoom=100,384,889
     """
+    normalize_1 = lambda x: (x-x.min())/(x- x.min()).sum()
+
     if y_soft.ndim == 1:
-        n_label = len(y_soft[y_soft > 0])
-        return F.relu((y_soft - (r/n_label)) / (1-r))
+        n_label = len(y_soft)
+        peak_value = (y_soft - ((r)/n_label)) / (1-r)
+        return normalize_1(F.relu(peak_value))
     elif y_soft.ndim == 2:
-        n_label = (y_soft > 0).sum(dim=1)
-        return F.relu((y_soft - (r / n_label).unsqueeze(1)) / (1-r))
+        n_label = (y_soft >= 0).sum(dim=1)
+        peak_value = (y_soft - ((r)/n_label.unsqueeze(1))) / (1-r)
+        peak_value = F.relu(peak_value)
+        
+        numerator = peak_value - peak_value.min(axis=1).values.unsqueeze(1)
+        denominator = numerator.sum(axis=1).unsqueeze(1)
+        return numerator /denominator
     else:
-        assert "plz check your tensor dim ... "
+        raise AssertionError
