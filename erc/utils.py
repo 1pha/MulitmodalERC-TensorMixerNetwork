@@ -7,6 +7,7 @@ import time
 import numpy as np
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 
 def get_logger(name: str = None, filehandler: bool = False):
@@ -43,3 +44,21 @@ def _seed_everything(seed):
     # If the above line is uncommented, we get the following RuntimeError:
     #  max_pool3d_with_indices_backward_cuda does not have a deterministic implementation
     torch.backends.cudnn.benchmark = False
+
+def reverse_soft(
+        y_soft : torch.Tensor,
+        r: int = 0.3
+    ) -> torch.Tensor:
+    """
+        We build our own hard labeling function 
+        idea source1: https://arxiv.org/pdf/1512.00567.pdf
+        idea source2: https://proceedings.mlr.press/v162/wei22b/wei22b.pdf#page=11&zoom=100,384,889
+    """
+    if y_soft.ndim == 1:
+        n_label = len(y_soft[y_soft > 0])
+        return F.relu((y_soft - (r/n_label)) / (1-r))
+    elif y_soft.ndim == 2:
+        n_label = (y_soft > 0).sum(dim=1)
+        return F.relu((y_soft - (r / n_label).unsqueeze(1)) / (1-r))
+    else:
+        assert "plz check your tensor dim ... "
