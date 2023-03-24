@@ -293,7 +293,7 @@ class MLP_Mixer_Roberta(nn.Module):
             "cls_loss": cls_loss.detach().cpu(),
             "reg_loss": reg_loss.detach().cpu(),
             "emotion": cls_labels.detach(),
-            "regress": labels["regress"].detach(),
+            "regress": labels["regress"].detach().float(),
             "cls_pred": cls_logits.detach(),
-            "reg_pred": reg_logits.detach(),
+            "reg_pred": reg_logits.detach().float(),
         }

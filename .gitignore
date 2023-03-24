@@ -10,6 +10,8 @@ kemdy19-kemdy20_train4/
 kemdy19-kemdy20_valid4/
 kemdy19-kemdy20_train4_multilabelTrue_rdeuceFalse/
 kemdy19-kemdy20_valid4_multilabelTrue_rdeuceFalse/
+aihub_valid4_multilabelTrue_rdeuceFalse/
+aihub_train4_multilabelTrue_rdeuceFalse/
 # Wandb directoriees
 wandb/
 etri-erc/
