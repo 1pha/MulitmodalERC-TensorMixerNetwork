@@ -158,7 +158,7 @@ class MLP_Mixer(nn.Module):
         elif cls_labels.ndim == 2:
             # Multi label case
             if self.use_peakl:
-                cls_labels = erc.utils.apply_peakl(y_soft=cls_labels)
+                cls_labels = erc.utils.apply_peakl(logits=cls_labels)
             cls_loss = self.criterions["cls"](cls_logits, cls_labels.float())
         
         reg_logits = logits[:, -2:]
@@ -284,7 +284,7 @@ class MLP_Mixer_Roberta(nn.Module):
         elif cls_labels.ndim == 2:
             # Multi label case
             if self.use_peakl:
-                cls_labels = erc.utils.apply_peakl(y_soft=cls_labels)
+                cls_labels = erc.utils.apply_peakl(logits=cls_labels)
             cls_loss = self.criterions["cls"](cls_logits, cls_labels.float())
         
         reg_logits = logits[:, -2:]
