@@ -45,20 +45,37 @@ def _seed_everything(seed):
     #  max_pool3d_with_indices_backward_cuda does not have a deterministic implementation
     torch.backends.cudnn.benchmark = False
 
-def reverse_soft(
-        y_soft : torch.Tensor,
-        r: int = 0.3
-    ) -> torch.Tensor:
+
+def normalize_1(logits: torch.Tensor) -> torch.Tensor:
+    dim = logits.ndim - 1
+    _min, _ = logits.min(dim=dim)
+    _min = _min.unsqueeze(dim)
+    logits = (logits - _min) / (logits - _min).sum(dim).unsqueeze(dim)
+    return logits
+
+
+def get_gamma(p: torch.Tensor) -> torch.Tensor:
+    eps = torch.finfo(float).eps
+    entropy = -p * torch.log(p + eps)
+    entropy = entropy.sum(dim=entropy.ndim -1)
+    gamma = torch.tanh(entropy)
+    return gamma
+    
+
+def apply_peakl(logits : torch.Tensor, r: float = None) -> torch.Tensor:
     """
         We build our own hard labeling function 
-        idea source1: https://arxiv.org/pdf/1512.00567.pdf
-        idea source2: https://proceedings.mlr.press/v162/wei22b/wei22b.pdf#page=11&zoom=100,384,889
-    """
-    if y_soft.ndim == 1:
-        n_label = len(y_soft[y_soft > 0])
-        return F.relu((y_soft - (r/n_label)) / (1-r))
-    elif y_soft.ndim == 2:
-        n_label = (y_soft > 0).sum(dim=1)
-        return F.relu((y_soft - (r / n_label).unsqueeze(1)) / (1-r))
+        reference
+         - https://arxiv.org/pdf/1512.00567.pdf
+         - https://proceedings.mlr.press/v162/wei22b/wei22b.pdf#page=11&zoom=100,384,889
+    """ 
+    dim = logits.ndim - 1
+    n_label = logits.size()[-1]
+
+    if r is None:
+        r = get_gamma(logits).unsqueeze(dim)
     else:
-        assert "plz check your tensor dim ... "
+        r = torch.tensor(r).unsqueeze(dim)
+    logit_peakl = (logits - (r / n_label)) / (1-r)
+    logit_peakl = normalize_1(F.relu(logit_peakl))
+    return logit_peakl
