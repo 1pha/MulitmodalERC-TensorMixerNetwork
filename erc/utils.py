@@ -62,7 +62,7 @@ def get_gamma(p: torch.Tensor) -> torch.Tensor:
     return gamma
     
 
-def reverse_soft(logits : torch.Tensor) -> torch.Tensor:
+def apply_peakl(logits : torch.Tensor, r: float = None) -> torch.Tensor:
     """
         We build our own hard labeling function 
         reference
@@ -72,7 +72,10 @@ def reverse_soft(logits : torch.Tensor) -> torch.Tensor:
     dim = logits.ndim - 1
     n_label = logits.size()[-1]
 
-    r = get_gamma(logits).unsqueeze(dim)
+    if r is None:
+        r = get_gamma(logits).unsqueeze(dim)
+    else:
+        r = torch.tensor(r).unsqueeze(dim)
     logit_peakl = (logits - (r / n_label)) / (1-r)
     logit_peakl = normalize_1(F.relu(logit_peakl))
     return logit_peakl
