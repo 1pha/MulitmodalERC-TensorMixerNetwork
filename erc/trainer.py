@@ -144,7 +144,8 @@ class ERCModule(pl.LightningModule):
             um = (emotion == v).sum(dim=1) == 1 # (bsz, ), unique mask
             if (um.sum() == 0).item():
                 # If every batches had deuce data
-                result = {k: _v[um] for k, _v in outputs.items() if _v.ndim > 0}
+                # Return scalar metrics only (removing cls/reg pred and logits)
+                result = {k: _v for k, _v in outputs.items() if _v.ndim == 0}
             else:
                 result.update(
                     {k: _v[um] for k, _v in outputs.items() if _v.ndim > 0}
@@ -161,7 +162,10 @@ class ERCModule(pl.LightningModule):
         unit: str = "epoch"
     ):
         result: dict = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
-        result = self.remove_deuce(outputs=result)
+        if unit == "step":
+            # No need to on epochs
+            result = self.remove_deuce(outputs=result)
+
         # Log Losses
         for loss_key in ["loss", "cls_loss", "reg_loss"]:
             if loss_key in result:
