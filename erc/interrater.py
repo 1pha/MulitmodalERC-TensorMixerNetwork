@@ -156,11 +156,15 @@ def _plot_heatmap(df: dict,
     sns.heatmap(corr, ax=ax, vmin=-.2, vmax=1, annot=True, fmt=".2f");
     
 
-def plot_heatmap(df: dict, group_idx: int = None, mask: pd.Series | str = None) -> None:
+def plot_heatmap(df: dict,
+                 group_idx: int = None,
+                 mask: pd.Series | str = None,
+                 suptitle: str = "") -> None:
     fig, ax = plt.subplots(figsize=(14, 6), ncols=2)
     group_name = "" if group_idx is None else f"Rater Group {group_idx}: "
     _plot_heatmap(df=df, col="arousal", ax=ax[0], group_name=group_name, mask=mask)
     _plot_heatmap(df=df, col="valence", ax=ax[1], group_name=group_name, mask=mask)
+    fig.suptitle(suptitle if suptitle else "")
     
     
 def get_irr(df: dict | pd.DataFrame, label: str = "emotion", mask: pd.Series | str = None):
