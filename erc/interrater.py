@@ -172,7 +172,6 @@ def get_irr(df: dict | pd.DataFrame, label: str = "emotion", mask: pd.Series | s
     print(label)
     table = CAC(df)
     
-    # Kleiss
     fleiss = table.fleiss()
     krippendorff = table.krippendorff()
     print(f"Fleiss Kappa: {fleiss['est']['coefficient_value']}", end="\t")
