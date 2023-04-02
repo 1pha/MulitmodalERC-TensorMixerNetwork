@@ -123,10 +123,10 @@ class ERCModule(pl.LightningModule):
                 data = outputs[0][key]
                 if data.ndim == 0:
                     # Scalar value result
-                    result[key] = torch.stack([o[key] for o in outputs])
+                    result[key] = torch.stack([o[key] for o in outputs if key in o])
                 elif data.ndim in [1, 2]:
                     # Batched 
-                    result[key] = torch.concat([o[key] for o in outputs])
+                    result[key] = torch.concat([o[key] for o in outputs if key in o])
         except AttributeError:
             logger.warn("Error provoking data %s", outputs)
             breakpoint()
