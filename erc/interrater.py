@@ -6,7 +6,10 @@ import pandas as pd
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
-from irrCAC.raw import CAC
+try:
+    from irrCAC.raw import CAC
+except:
+    pass
 
 from erc.constants import emotion2idx
 
