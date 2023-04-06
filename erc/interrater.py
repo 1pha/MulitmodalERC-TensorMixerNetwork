@@ -1,6 +1,7 @@
 from typing import Dict
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
@@ -139,32 +140,45 @@ def kemdy20_get_rater(
     return grouped_dict_df
 
 
+def get_corr_mean(corr: dict, label: str = "arousal") -> np.ndarray:
+    corr: np.ndarray = corr[label].values
+    np.fill_diagonal(a=corr, val=np.nan)
+    mean = np.nanmean(corr, axis=0)
+    std = np.nanstd(corr, axis=0)
+    return mean, std
+
+
 def _plot_heatmap(df: dict,
                   col: str,
                   ax: plt.axes,
                   group_name: str = None,
-                  mask: pd.Series | str = None) -> None:
+                  mask: pd.Series | str = None) -> pd.DataFrame:
     if mask is not None:
         if isinstance(mask, pd.Series):
             df = df[col][mask]
         elif isinstance(mask, str):
             mask = df["segment_id"].str.contains(mask)
             df = df[col][mask]
+    else:
+        df = df[col]
     corr = df.astype(float).corr()
     title = f"{group_name if group_name is not None else ''} {col}"
     ax.set_title(title.capitalize())
     sns.heatmap(corr, ax=ax, vmin=-.2, vmax=1, annot=True, fmt=".2f");
+    return corr
     
 
 def plot_heatmap(df: dict,
                  group_idx: int = None,
                  mask: pd.Series | str = None,
-                 suptitle: str = "") -> None:
+                 suptitle: str = "") -> dict:
     fig, ax = plt.subplots(figsize=(14, 6), ncols=2)
     group_name = "" if group_idx is None else f"Rater Group {group_idx}: "
-    _plot_heatmap(df=df, col="arousal", ax=ax[0], group_name=group_name, mask=mask)
-    _plot_heatmap(df=df, col="valence", ax=ax[1], group_name=group_name, mask=mask)
+    corrs = dict()
+    for idx, col in enumerate(["arousal", "valence"]):
+        corrs[col] = _plot_heatmap(df=df, col=col, ax=ax[idx], group_name=group_name, mask=mask)
     fig.suptitle(suptitle if suptitle else "")
+    return corrs
     
     
 def get_irr(df: dict | pd.DataFrame, label: str = "emotion", mask: pd.Series | str = None):
