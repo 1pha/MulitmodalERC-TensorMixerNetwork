@@ -1,4 +1,4 @@
 pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
-pip install -r requirements.txt
-pip install -q git+https://github.com/huggingface/peft.git
-pip install --upgrade hydra-core
+pip3 install -r requirements.txt
+pip3 install -q git+https://github.com/huggingface/peft.git
+pip3 install --upgrade hydra-core
