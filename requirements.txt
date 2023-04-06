@@ -19,4 +19,5 @@ datasets
 accelerate
 wandb
 einops
-irrCAC
+irrcac
+scikit-learn
