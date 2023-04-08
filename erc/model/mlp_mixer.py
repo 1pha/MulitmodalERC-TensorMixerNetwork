@@ -212,7 +212,7 @@ class MLP_Mixer_Roberta(nn.Module):
                 if _k[0] == "wav_model" and _k[1] != "classifier":
                     _k.insert(1, "wav2vec2")
                 elif _k[0] == "txt_model" and _k[1] != "classifier":
-                    _k.insert(1, "bert")
+                    _k.insert(1, "roberta")
                 return ".".join(_k)
             ckpt = {parser(k): v for k, v in config_kwargs["checkpoint"].items()}
             self.load_state_dict(ckpt, strict=False)

@@ -27,6 +27,7 @@ class ERCModule(pl.LightningModule):
                  separate_lr: dict = None):
         super().__init__()
         self.model = model
+        breakpoint()
 
         # Dataloaders
         self.train_loader = train_loader

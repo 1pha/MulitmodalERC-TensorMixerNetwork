@@ -205,16 +205,17 @@ class MLP_Mixer_Roberta(nn.Module):
         if config_kwargs.get("checkpoint"):
             for name, param in self.state_dict().items():
                 if param.requires_grad:
-                    print(name)
+                    logger.info(name)
             logger.info("Load from checkpoint")
             def parser(k):
                 _k = k.split(".")[1:]
                 if _k[0] == "wav_model" and _k[1] != "classifier":
                     _k.insert(1, "wav2vec2")
                 elif _k[0] == "txt_model" and _k[1] != "classifier":
-                    _k.insert(1, "bert")
+                    _k.insert(1, "roberta")
                 return ".".join(_k)
             ckpt = {parser(k): v for k, v in config_kwargs["checkpoint"].items()}
+            breakpoint()
             self.load_state_dict(ckpt, strict=False)
         if "lora" in config:
             logger.info("Train with Lora")
@@ -271,4 +272,12 @@ class MLP_Mixer_Roberta(nn.Module):
                 if self.txt_gender:
                     pooled_txt_output = pooled_txt_output + gender_embed
 
-        return pooled_wav_output, pooled_txt_output
+        # (B, 1 , WAV_proj_size, BERT_proj_size)
+        matmul_output = torch.bmm(pooled_wav_output.unsqueeze(2), pooled_txt_output.unsqueeze(1)).unsqueeze(1)
+        result = dict()
+        x = matmul_output
+        for idx, layer in enumerate(self.mlp_mixer):
+            x = layer(x)
+            if idx in [13, 15, 16]:
+                result[idx] = x
+        return result
