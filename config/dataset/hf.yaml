@@ -4,7 +4,7 @@ validation_fold: 4
 wav_processor: kresnik/wav2vec2-large-xlsr-korean
 sampling_rate: 16_000
 wav_max_length: 112_000 # 16_000 * 7, 7secs duration
-txt_processor: klue/bert-base
+txt_processor: klue/roberta-large
 txt_max_length: 64
 load_from_cache_file: True
 num_proc: 8

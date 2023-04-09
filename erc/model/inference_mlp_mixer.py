@@ -205,7 +205,7 @@ class MLP_Mixer_Roberta(nn.Module):
         if config_kwargs.get("checkpoint"):
             for name, param in self.state_dict().items():
                 if param.requires_grad:
-                    print(name)
+                    logger.info(name)
             logger.info("Load from checkpoint")
             def parser(k):
                 _k = k.split(".")[1:]
@@ -215,6 +215,7 @@ class MLP_Mixer_Roberta(nn.Module):
                     _k.insert(1, "roberta")
                 return ".".join(_k)
             ckpt = {parser(k): v for k, v in config_kwargs["checkpoint"].items()}
+            breakpoint()
             self.load_state_dict(ckpt, strict=False)
         if "lora" in config:
             logger.info("Train with Lora")
@@ -273,30 +274,10 @@ class MLP_Mixer_Roberta(nn.Module):
 
         # (B, 1 , WAV_proj_size, BERT_proj_size)
         matmul_output = torch.bmm(pooled_wav_output.unsqueeze(2), pooled_txt_output.unsqueeze(1)).unsqueeze(1)
-        logits = self.mlp_mixer(matmul_output) # (B, num_labels)
-
-        # calcuate the loss fct
-        cls_logits = logits[:, :-2]
-        cls_labels = labels["emotion"]
-        if cls_labels.ndim == 1:
-            # Single label case
-            cls_loss = self.criterions["cls"](cls_logits, cls_labels.long())
-        elif cls_labels.ndim == 2:
-            # Multi label case
-            if self.use_peakl:
-                cls_labels = erc.utils.apply_peakl(logits=cls_labels)
-            cls_loss = self.criterions["cls"](cls_logits, cls_labels.float())
-        
-        reg_logits = logits[:, -2:]
-        reg_loss = self.criterions["reg"](reg_logits, labels["regress"].float())
-
-        total_loss = cls_loss * self.cls_coef + reg_loss * self.reg_coef
-        return {
-            "loss": total_loss,
-            "cls_loss": cls_loss.detach().cpu(),
-            "reg_loss": reg_loss.detach().cpu(),
-            "emotion": cls_labels.detach(),
-            "regress": labels["regress"].detach().float(),
-            "cls_pred": cls_logits.detach(),
-            "reg_pred": reg_logits.detach().float(),
-        }
+        result = dict()
+        x = matmul_output
+        for idx, layer in enumerate(self.mlp_mixer):
+            x = layer(x)
+            if idx in [13, 15, 16]:
+                result[idx] = x
+        return result
