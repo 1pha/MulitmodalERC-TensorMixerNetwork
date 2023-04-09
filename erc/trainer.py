@@ -163,13 +163,12 @@ class ERCModule(pl.LightningModule):
         unit: str = "epoch"
     ):
         result: dict = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
+        on_step: bool = unit == "step"
+        on_epoch: bool = unit == "epoch"
+        
         if unit == "step":
             # No need to on epochs
             result = self.remove_deuce(outputs=result)
-            
-        on_step: bool = unit == "step"
-        on_epoch: bool = unit == "epoch"
-
         # Log Losses
         for loss_key in ["loss", "cls_loss", "reg_loss"]:
             if loss_key in result:
@@ -187,13 +186,18 @@ class ERCModule(pl.LightningModule):
                            target=result["emotion"],
                            task="multiclass",
                            num_classes=7)
-            _f1 = multiclass_f1_score(preds=result["cls_pred"],
+            _macro_f1 = multiclass_f1_score(preds=result["cls_pred"],
                                       target=result["emotion"],
                                       average="macro",
                                       num_classes=7)
+            _micro_f1 = multiclass_f1_score(preds=result["cls_pred"],
+                                      target=result["emotion"],
+                                      average="micro",
+                                      num_classes=7)
             self.log(f'{unit}/{mode}_acc', _acc, on_step=on_step, on_epoch=on_epoch)
             self.log(f'{unit}/{mode}_auroc', _auroc, on_step=on_step, on_epoch=on_epoch)
-            self.log(f'{unit}/{mode}_f1', _f1, on_step=on_step, on_epoch=on_epoch)
+            self.log(f'{unit}/{mode}_macrof1', _macro_f1, on_step=on_step, on_epoch=on_epoch)
+            self.log(f'{unit}/{mode}_microf1', _micro_f1, on_step=on_step, on_epoch=on_epoch)
 
         # Log Regression Metrics: CCC
         if "reg_pred" in result and "regress" in result:
@@ -203,39 +207,6 @@ class ERCModule(pl.LightningModule):
             self.log(f"{unit}/{mode}_ccc(aro)", ccc_aro, on_step=on_step, on_epoch=on_epoch)
         return result
 
-    def _log_result(
-        self, 
-        outputs: List[Dict] | dict, 
-        mode: erc.constants.RunMode | str = "train",
-        unit: str = "epoch"
-    ):
-        result: dict = self._sort_outputs(outputs=outputs) if isinstance(outputs, list) else outputs
-        if unit == "step":
-            # No need to on epochs
-            result = self.remove_deuce(outputs=result)
-
-        # Log Losses
-        for loss_key in ["loss", "cls_loss", "reg_loss"]:
-            if loss_key in result:
-                self.log(f"{unit}/{mode}_{loss_key}", torch.mean(result.get(loss_key, 0)), prog_bar=True)
-
-        # Log Classification Metrics: Accuracy & AUROC
-        if "cls_pred" in result and "emotion" in result:
-            self.acc(preds=result["cls_pred"], target=result["emotion"])
-            self.auroc(preds=result["cls_pred"], target=result["emotion"])
-            self.f1(preds=result["cls_pred"], target=result["emotion"])
-            self.log(f'{unit}/{mode}_acc', self.acc)
-            self.log(f'{unit}/{mode}_auroc', self.auroc)
-            self.log(f'{unit}/{mode}_f1', self.f1)
-
-        # Log Regression Metrics: CCC
-        if "reg_pred" in result and "regress" in result:
-            self.ccc_val(result["reg_pred"][:, 0], result["regress"][:, 0])
-            self.ccc_aro(result["reg_pred"][:, 1], result["regress"][:, 1])
-            self.log(f"{unit}/{mode}_ccc(val)", self.ccc_val)
-            self.log(f"{unit}/{mode}_ccc(aro)", self.ccc_aro)
-        return result
-        
     def log_confusion_matrix(self, result: dict):
         preds = result["cls_pred"].cpu().detach() if "cls_pred" in result else None
         labels = result["emotion"].cpu().numpy() if "emotion" in result else None
@@ -290,7 +261,6 @@ def setup_trainer(config: omegaconf.DictConfig) -> pl.LightningModule:
                                     scheduler=config.scheduler,
                                     train_loader=dataloaders["train"],
                                     valid_loader=dataloaders["valid"])
-
     return module, dataloaders
 
 
@@ -322,4 +292,5 @@ def inference(config: omegaconf.DictConfig) -> None:
                                  dataloaders=dataloaders["valid"],
                                  return_predictions=True)
     prediction = module._sort_outputs(prediction)
+    # TODO
     breakpoint()

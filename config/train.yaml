@@ -7,7 +7,7 @@ hydra:
 defaults:
   - _self_
   - dataset: hf
-  - model: mlp_mixer
+  - model: mlp_mixer_roberta
   - scheduler: cosine_warmup
 
 dataloader:
@@ -39,7 +39,7 @@ module:
   
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
-  project: RobertaL
+  project: RobertaL Final
   entity: etri-erc
   name: RobertaL
 
@@ -65,8 +65,8 @@ callbacks:
     mode: max
     save_top_k: 1
     save_last: False
-    Is useful to set it to False when metric names contain / as this will result in extra folders
-    auto_insert_metric_name: False
+    # Is useful to set it to False when metric names contain / as this will result in extra folders
+    # auto_insert_metric_name: False
 
   # https://pytorch-lightning.readthedocs.io/en/stable/common/early_stopping.html
   early_stop:
