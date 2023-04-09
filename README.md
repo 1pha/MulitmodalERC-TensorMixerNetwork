@@ -1,5 +1,6 @@
 # Multi-modal Emotion Recognition in Conversation (ERC) @ ETRI
 
+## Emotion Distribution across
 ![image](./assets/embed.png)
 [Competition Links](https://aifactory.space/competition/detail/2234)
 

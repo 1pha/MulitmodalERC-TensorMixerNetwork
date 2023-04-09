@@ -186,13 +186,18 @@ class ERCModule(pl.LightningModule):
                            target=result["emotion"],
                            task="multiclass",
                            num_classes=7)
-            _f1 = multiclass_f1_score(preds=result["cls_pred"],
+            _macro_f1 = multiclass_f1_score(preds=result["cls_pred"],
                                       target=result["emotion"],
                                       average="macro",
                                       num_classes=7)
+            _micro_f1 = multiclass_f1_score(preds=result["cls_pred"],
+                                      target=result["emotion"],
+                                      average="micro",
+                                      num_classes=7)
             self.log(f'{unit}/{mode}_acc', _acc, on_step=on_step, on_epoch=on_epoch)
             self.log(f'{unit}/{mode}_auroc', _auroc, on_step=on_step, on_epoch=on_epoch)
-            self.log(f'{unit}/{mode}_f1', _f1, on_step=on_step, on_epoch=on_epoch)
+            self.log(f'{unit}/{mode}_macrof1', _macro_f1, on_step=on_step, on_epoch=on_epoch)
+            self.log(f'{unit}/{mode}_microf1', _micro_f1, on_step=on_step, on_epoch=on_epoch)
 
         # Log Regression Metrics: CCC
         if "reg_pred" in result and "regress" in result:

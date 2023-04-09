@@ -7,7 +7,7 @@ hydra:
 defaults:
   - _self_
   - dataset: hf
-  - model: mlp_mixer
+  - model: mlp_mixer_roberta
   - scheduler: cosine_warmup
 
 dataloader:
@@ -39,7 +39,7 @@ module:
   
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
-  project: RobertaL
+  project: RobertaL Final
   entity: etri-erc
   name: RobertaL
 

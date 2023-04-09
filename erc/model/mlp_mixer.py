@@ -182,7 +182,7 @@ class MLP_Mixer_Roberta(nn.Module):
         self,
         config: str,
         criterions: torch.nn.Module,
-        cls_coef: float = 0.5,
+        cls_coef: float = 0.7,
         **config_kwargs
     ):
         super().__init__()
