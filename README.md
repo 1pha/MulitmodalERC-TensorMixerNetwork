@@ -1,5 +1,6 @@
 # Multi-modal Emotion Recognition in Conversation (ERC) @ ETRI
 
+![image](./assets/embed.png)
 [Competition Links](https://aifactory.space/competition/detail/2234)
 
 ## 1. Data
