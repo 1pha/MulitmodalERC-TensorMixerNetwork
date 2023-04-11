@@ -41,7 +41,7 @@ class KEMDBase(Dataset):
         return_bio: bool = False,
         max_length_wav: int = 200_000,
         max_length_txt: int = 50,
-        tokenizer_name: str = "klue/roberta-large",
+        tokenizer_name: str = "klue/bert-base",
         multilabel: bool = False,
         remove_deuce: bool = False,
         validation_fold: int = 4,
@@ -496,7 +496,7 @@ class KEMDDataset(Dataset):
         validation_fold: int = 4,
         max_length_wav: int = 80_000,
         max_length_txt: int = 50,
-        tokenizer_name: str = "klue/roberta-large",
+        tokenizer_name: str = "klue/bert-base",
         multilabel: bool = False,
         remove_deuce: bool = True,
         mode: RunMode | str = RunMode.TRAIN,
@@ -542,12 +542,12 @@ class HF_KEMD:
         wav_processor: str = "kresnik/wav2vec2-large-xlsr-korean",
         sampling_rate: int = 16_000,
         wav_max_length: int = 112_000, # 16_000 * 7, 7secs duration
-        txt_processor: str = "klue/roberta-large",
+        txt_processor: str = "klue/bert-base",
         txt_max_length: int = 64,
         multilabel: bool = False,
         remove_deuce: bool = True,
         load_from_cache_file: bool = True,
-        num_proc: int = 8,
+        num_proc: int = 1,
         batched: bool = True,
         batch_size: int = 1000, # Not a torch batch_size
         writer_batch_size: int = 1000,
@@ -635,9 +635,7 @@ class HF_KEMD:
             self.map_kwargs = dict(
                 batched=batched,
                 batch_size=batch_size,
-                writer_batch_size=writer_batch_size,
                 desc=f"Pre-process wave & text {mode}",
-                load_from_cache_file=load_from_cache_file,
                 num_proc=num_proc,
             )
             if preprocess:

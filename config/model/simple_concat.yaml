@@ -5,7 +5,7 @@ config:
 
 criterions:
   cls:
-    _target_: torch.nn.CrossEntropyLoss
+    _target_: erc.optims.FocalLoss
   reg:
     _target_: torch.nn.MSELoss
 cls_coef: 0.7
