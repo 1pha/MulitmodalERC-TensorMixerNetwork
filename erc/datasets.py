@@ -42,7 +42,7 @@ class KEMDBase(Dataset):
         return_bio: bool = False,
         max_length_wav: int = 200_000,
         max_length_txt: int = 50,
-        tokenizer_name: str = "klue/bert-base",
+        tokenizer_name: str = "klue/roberta-large",
         multilabel: bool = False,
         remove_deuce: bool = False,
         validation_fold: int = 4,
@@ -460,7 +460,7 @@ class HF_KEMD:
         wav_processor: str = "kresnik/wav2vec2-large-xlsr-korean",
         sampling_rate: int = 16_000,
         wav_max_length: int = 112_000, # 16_000 * 7, 7secs duration
-        txt_processor: str = "klue/bert-base",
+        txt_processor: str = "klue/roberta-large",
         txt_max_length: int = 64,
         multilabel: bool = False,
         remove_deuce: bool = True,
@@ -508,7 +508,7 @@ class HF_KEMD:
                 # Note for hard-coded kwargs
                 generate_csv=False,
                 return_bio=False,
-                tokenizer_name=None,
+                tokenizer_name=None, # Tokenization after loading torch dataset
                 max_length_wav=wav_max_length,
                 max_length_txt=txt_max_length,
                 multilabel=multilabel,

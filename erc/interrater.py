@@ -162,12 +162,13 @@ def _plot_heatmap(df: dict,
         if isinstance(mask, pd.Series):
             df = df[col][mask]
         elif isinstance(mask, str):
-            mask = df["segment_id"].str.contains(mask)
-            df = df[col][mask]
+            _mask = df["segment_id"].str.contains(mask)
+            df = df[col][_mask]
     else:
         df = df[col]
     corr = df.astype(float).corr()
-    title = f"{group_name if group_name is not None else ''} {col}"
+    _gtitle = f"{group_name if group_name is not None else ''} " + f"{mask if isinstance(mask, str) else ''}"
+    title = f"{_gtitle} {col}"
     ax.set_title(title.capitalize())
     sns.heatmap(corr, ax=ax, vmin=-.2, vmax=1, annot=True, fmt=".2f");
     return corr
