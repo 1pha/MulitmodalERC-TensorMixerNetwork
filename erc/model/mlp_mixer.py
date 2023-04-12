@@ -62,13 +62,11 @@ def MLPMixer(*, image_size, channels, patch_size, dim, depth, num_classes, expan
 
 class MLP_Mixer(nn.Module):
     TASK = Task.ALL
-    def __init__(
-        self,
-        config: str,
-        criterions: torch.nn.Module,
-        cls_coef: float = 0.5,
-        **config_kwargs
-    ):
+    def __init__(self,
+                 config: str,
+                 criterions: torch.nn.Module,
+                 cls_coef: float = 0.5,
+                 **config_kwargs):
         super().__init__()
         self.wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav'])
         self.txt_model = BertForSequenceClassification.from_pretrained(config['txt'])
@@ -112,15 +110,13 @@ class MLP_Mixer(nn.Module):
         self.cls_coef = cls_coef
         self.reg_coef = 1 - cls_coef
 
-    def forward(
-        self,
-        wav: torch.Tensor,
-        wav_mask: torch.Tensor,
-        txt: torch.Tensor,
-        txt_mask: torch.Tensor,
-        labels: torch.Tensor = None,
-        **kwargs
-    ) -> dict:
+    def forward(self,
+                wav: torch.Tensor,
+                wav_mask: torch.Tensor,
+                txt: torch.Tensor,
+                txt_mask: torch.Tensor,
+                labels: torch.Tensor = None,
+                **kwargs) -> dict:
         """ Size
          WAV_hidden_dim: 1024
          WAV_proj_size: 256
@@ -197,7 +193,6 @@ class MLP_Mixer_Roberta(nn.Module):
         }[config["txt"]]
         self.txt_projector = nn.Linear(last_hdn_size, proj_size)
         
-        
         self.use_peakl = config_kwargs.get("use_peakl", False)
         
         # Loading Checkpoints
@@ -234,15 +229,13 @@ class MLP_Mixer_Roberta(nn.Module):
         self.cls_coef = cls_coef
         self.reg_coef = 1 - cls_coef
 
-    def forward(
-        self,
-        wav: torch.Tensor,
-        wav_mask: torch.Tensor,
-        txt: torch.Tensor,
-        txt_mask: torch.Tensor,
-        labels: torch.Tensor = None,
-        **kwargs
-    ) -> dict:
+    def forward(self,
+                wav: torch.Tensor,
+                wav_mask: torch.Tensor,
+                txt: torch.Tensor,
+                txt_mask: torch.Tensor,
+                labels: torch.Tensor = None,
+                **kwargs) -> dict:
         """ Size
          WAV_hidden_dim: 1024
          WAV_proj_size: 256

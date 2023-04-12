@@ -1,5 +1,11 @@
 # Model Descriptions
 
+## [Wav2Vec2](https://arxiv.org/abs/2006.11477)
+- [Pre-trained Weights](https://huggingface.co/kresnik/wav2vec2-large-xlsr-korean)
+
+## [RoBERTa](https://arxiv.org/abs/1907.11692)
+- [Pre-trained Weights](https://huggingface.co/klue/roberta-large)
+
 ## [MLP Mixer](https://arxiv.org/abs/2105.01601)
 
 Implemented with the help of [lucidrains/mlp-mixer-pytorch](https://github.com/lucidrains/mlp-mixer-pytorch)

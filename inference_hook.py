@@ -1,3 +1,6 @@
+""" Fetch middleware outputs from our trained models
+Most codes are hard-coded
+"""
 import os
 import pickle
 
@@ -17,27 +20,26 @@ def get_label(batch: dict, task: erc.constants.Task = None, device: str = "cpu")
         "regress": torch.stack([batch["valence"], batch["arousal"]], dim=1).to(device),
         "vote_emotion": batch.get("vote_emotion", None)
     }
-    # TODO: Add Multilabel Fetch
     return labels
 
 
 @torch.no_grad()
 def main():
     erc.utils._seed_everything(42)
-    ##################
-    # valid-dataloader
-    ##################
+    ##############################
+    # Load Validation Dataloader
+    ##############################
     BATCH_SIZE = 8
     valid_dataset = load_from_disk("/home/1pha/codespace/etri-erc/kemdy19-kemdy20_valid4_multilabelFalse_rdeuceTrue")
     valid_dataloadaer = DataLoader(valid_dataset, batch_size=BATCH_SIZE)
 
-    ################
-    # model load 
-    ################
+    ##############################
+    # Load Trained Model
+    ##############################
     with initialize(version_base=None, config_path="./config/model"):
         cfg = compose(config_name="mlp_mixer_roberta")
     cfg.config['txt'] = "klue/roberta-large"
-    # cfg['_target_'] = "erc.model.inference_mlp_mixer.MLP_Mixer_Roberta"
+    cfg['_target_'] = "erc.model.inference_mlp_mixer.MLP_Mixer_Roberta"
 
 
     CKPT = '/home/1pha/codespace/etri-erc/weights_AI_HUB/epoch=29-step=92640.ckpt'
@@ -55,7 +57,7 @@ def main():
                 iterable=enumerate(valid_dataloadaer))
 
     for batch_idx, batch in pbar:
-        labels = get_label(batch, device=device) # concat 
+        labels = get_label(batch, device=device)
         result = model(wav=batch["wav"].to(device),
                        wav_mask=batch["wav_mask"].to(device),
                        txt=batch["txt"].to(device),
@@ -63,7 +65,7 @@ def main():
                        labels=labels)
         save_dict = {
             "batch_idx": batch_idx,
-            # "emotion": labels['emotion'],
+            "emotion": labels['emotion'],
         }
         save_dict.update(result)
         

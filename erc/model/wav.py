@@ -1,4 +1,4 @@
-""" Training Sequence with wav data only
+""" [Outdated] Training Sequence with wav data only
 """
 import torch
 import torch.nn as nn

@@ -67,7 +67,7 @@ def apply_peakl(logits : torch.Tensor, r: float = None) -> torch.Tensor:
         We build our own hard labeling function 
         reference
          - https://arxiv.org/pdf/1512.00567.pdf
-         - https://proceedings.mlr.press/v162/wei22b/wei22b.pdf#page=11&zoom=100,384,889
+         - https://proceedings.mlr.press/v162/wei22b/wei22b.pdf
     """ 
     dim = logits.ndim - 1
     n_label = logits.size()[-1]

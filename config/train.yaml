@@ -26,7 +26,6 @@ misc:
   seed: 42
   debug: False
   modes: [ train, valid ]
-  # "w11wo/wav2vec2-xls-r-300m-korean" for other pre-trained
 
 module:
   _target_: erc.trainer.ERCModule
