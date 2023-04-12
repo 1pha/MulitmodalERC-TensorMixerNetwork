@@ -1,13 +1,31 @@
 # Multi-modal Emotion Recognition through Tensor Fusion
 This repository contains codebase for Multi-modal Emotion Recognition through Tensor Fusion. Our contributions as follows
 - We propose `PeakL`, Peaking Labels, to make a peak for flattened/vague multi-rated decisions
-- We predict 7-class emotions and valence & arousal level with multi-modal input: audio and text at the same time, through **Tensor-Fusion**
+- We predict 7-class emotions and valence & arousal level with multi-modal input: audio and text at the same time, through [**Tensor-Fusion**](https://aclanthology.org/D17-1115/)
 - Our work also discovered that learned embeddings after proposed **Tensor-Fusion** aligns on human-rated valence-arousal maps.
-## Emotion Distributions and Learned Embeddings
+
+## Work Summary
+### Emotion Distributions and Learned Embeddings
+- (Left): Human raters valence & arousal emotion cluster maps.
+- (Right): Dimensionality reduction with UMAP of our **Tensor-Fusion** networks last linear layer before classification/regression.
+
+One can easily see their emotion clusters are aligned with human rated valence & arousal space.
 ![image](./assets/embed.png)
 
+### `PeakL` Distributions
+Below figure represents the distribution before and after applying `PeakL`. Distribution after application are represented in orange and one can observe that these distributions are more left-centered (more certain). Our motivation comes from observation that one-hot classification deters regression performance while using soft-labels with naive raters decision deters classification result.
+![image](./assets/peakl.png)
+
+### Training Pipeline
+We encode audio and text through pre-trained [wav2vec2](https://huggingface.co/kresnik/wav2vec2-large-xlsr-korean) and [Roberta-large](https://huggingface.co/klue/roberta-large). We pool outputs to produce a single column vector for each data and apply outer products to create modality-fused matrix (tensor-fusion). We feed this matrix to [MLP-mixer](https://arxiv.org/abs/2105.01601) to perform both emotion classification and valence & arousal regression. 
+![image](./assets/pipeline.png)
+
+
 - [Multi-modal Emotion Recognition through Tensor Fusion](#multi-modal-emotion-recognition-through-tensor-fusion)
-  - [Emotion Distributions and Learned Embeddings](#emotion-distributions-and-learned-embeddings)
+  - [Work Summary](#work-summary)
+    - [Emotion Distributions and Learned Embeddings](#emotion-distributions-and-learned-embeddings)
+    - [`PeakL` Distributions](#peakl-distributions)
+    - [Training Pipeline](#training-pipeline)
   - [1. Data](#1-data)
     - [About Data](#about-data)
   - [2. Code](#2-code)
@@ -18,6 +36,7 @@ This repository contains codebase for Multi-modal Emotion Recognition through Te
     - [Fast Dev](#fast-dev)
     - [Testing Functions with `fire`](#testing-functions-with-fire)
   - [3. Reference](#3-reference)
+
 
 ## 1. Data
 ### About Data
