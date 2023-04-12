@@ -107,8 +107,7 @@ class ERCModule(pl.LightningModule):
                                       wav_mask=batch["wav_mask"],
                                       txt=batch["txt"],
                                       txt_mask=batch["txt_mask"],
-                                      labels=labels,
-                                      gender=batch.get("gender", None))
+                                      labels=labels)
             return result
         except RuntimeError:
             # For CUDA Device-side asserted error

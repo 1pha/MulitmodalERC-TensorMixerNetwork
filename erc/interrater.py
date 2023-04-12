@@ -7,6 +7,8 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 try:
+    # Installing irrCAC provokes an error in unknown cases
+    # Since this is not explicitly used in baseline, we exclude this for now
     from irrCAC.raw import CAC
 except:
     pass
