@@ -465,7 +465,7 @@ class HF_KEMD:
         multilabel: bool = False,
         remove_deuce: bool = True,
         load_from_cache_file: bool = True,
-        num_proc: int = 8,
+        num_proc: int = 1,
         batched: bool = True,
         batch_size: int = 1000, # Not a torch batch_size
         writer_batch_size: int = 1000,
@@ -554,9 +554,7 @@ class HF_KEMD:
             self.map_kwargs = dict(
                 batched=batched,
                 batch_size=batch_size,
-                writer_batch_size=writer_batch_size,
                 desc=f"Pre-process wave & text {mode}",
-                load_from_cache_file=load_from_cache_file,
                 num_proc=num_proc,
             )
             if preprocess:

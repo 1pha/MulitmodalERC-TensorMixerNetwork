@@ -91,18 +91,26 @@ class SimpleConcatRoberta(nn.Module):
         config: str,
         criterions: torch.nn.Module,
         cls_coef: float = 0.7,
-        config_kwargs: dict = None
+        **config_kwargs
     ):
         super().__init__()
         self.wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav']).wav2vec2
         self.txt_model = RobertaForSequenceClassification.from_pretrained(config['txt']).roberta
+
         proj_size = self.wav_model.config.classifier_proj_size
-        
-        self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, self.wav_model.config.classifier_proj_size)
-        self.txt_projector = nn.Linear(768, self.wav_model.config.classifier_proj_size)
-        self.simple_concat_1 = nn.Linear(proj_size*2, proj_size)
-        # self.dropout = nn.Dropout(0.2)
-        self.simple_concat_2 = nn.Linear(proj_size, 9)
+        self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, proj_size)
+        last_hdn_size = {
+            "klue/roberta-base": 768, "klue/roberta-large": 1024
+        }[config["txt"]]
+        self.txt_projector = nn.Linear(last_hdn_size, proj_size)        
+        self.simple_concat = nn.Sequential(
+                                    nn.Linear(proj_size*2, proj_size),
+                                    nn.ReLU(),
+                                    nn.Linear(proj_size, 9)
+                            )
+
+
+        self.use_peakl = config_kwargs.get("use_peakl", False)
 
         self.criterions = criterions
         if not (0 < cls_coef < 1):
@@ -142,8 +150,7 @@ class SimpleConcatRoberta(nn.Module):
 
         # (B, WAV_proj_size + BERT_proj_size)
         concat_output = torch.cat((pooled_wav_output, pooled_txt_output), dim=1)
-        concat_output = self.simple_concat_1(concat_output) # (B, num_labels)
-        logits = self.simple_concat_2(concat_output) # (B, num_labels)
+        logits = self.simple_concat(concat_output) # (B, num_labels)
 
         # calcuate the loss fct
         cls_logits = logits[:, :-2]
