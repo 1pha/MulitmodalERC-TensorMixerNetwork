@@ -25,6 +25,35 @@ Data contains 3 modalities
 - `.wav`: Audio file
 - `.txt`: Script of an audio
 - `.csv`: Electrocardiogram & Electrodermal activity data
+```
+./
+├── README.md
+├── assets
+├── config
+├── data
+├── erc
+├── train.py
+├── requirements.txt
+├── setup.sh
+└── train.sh
+```
+
+```
+./data
+├── KEMDy19
+│   ├── ECG
+│   ├── EDA
+│   ├── TEMP
+│   ├── annotation
+│   └── wav
+├── KEMDy20_v1_1
+│   ├── EDA
+│   ├── IBI
+│   ├── TEMP
+│   ├── annotation
+│   └── wav
+```
+
 
 ## 2. Code
 ### 2.1 Basic Setups
