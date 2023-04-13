@@ -1,19 +1,14 @@
-###################  simple concat
 #!/bin/bash
 export CUDA_VISIBLE_DEVICES=1
 export HYDRA_FULL_ERROR=1
 
 
-# Ppeakl 
-# for fold in $(seq 0 4) # k-fold
-# do
-#     python train.py dataset.validation_fold=${fold}\
-#                     dataset.multilabel=True\
-#                     dataset.remove_deuce=False\
-#                     +model.use_peakl=True\
-#                     model=simple_concat\
-#                     logger.name="Concat | peakl"
-# done
+python train.py dataset.validation_fold=4\
+                    dataset.multilabel=True\
+                    dataset.remove_deuce=False\
+                    +model.use_peakl=False\
+                    logger.name="Scratch | soft"
+
 
 # No Ppeakl
 for fold in $(seq 0 4) # k-fold

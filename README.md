@@ -110,3 +110,13 @@ For example, if one needs to test [`preprocess.make_total_df`](erc/preprocess.py
 
 - [Korean Pre-trained Survey](https://arxiv.org/pdf/2112.03014.pdf)
 - [Huggingface Hub](https://huggingface.co/models?language=ko&sort=downloads)
+
+
+
+Result table 
+,T,dof,alternative,p-val,CI95%,cohen-d,BF10,power
+epoch/valid_acc,9.7021,4,two-sided,0.0006,[0.01 0.01],0.4927,52.725,0.1379
+epoch/valid_macrof1,11.8231,4,two-sided,0.0003,[0.01 0.02],0.7127,92.844,0.2342
+epoch/valid_microf1,9.7021,4,two-sided,0.0006,[0.01 0.01],0.4927,52.725,0.1379
+epoch/valid_ccc(aro),1.567,4,two-sided,0.1922,[-0.01  0.02],0.6379,0.873,0.1977
+epoch/valid_ccc(val),3.6245,4,two-sided,0.0223,[0.   0.02],0.7926,3.958,0.2768
