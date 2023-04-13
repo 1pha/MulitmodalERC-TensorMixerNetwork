@@ -15,17 +15,21 @@ One can easily see their emotion clusters are aligned with human rated valence &
 ### `PeakL` Distributions
 Below figure represents the distribution before and after applying `PeakL`. Distribution after application are represented in orange and one can observe that these distributions are more left-centered (more certain). Our motivation comes from observation that one-hot classification deters regression performance while using soft-labels with naive raters decision deters classification result.
 ![image](./assets/peakl.png)
+Performance comparison between `PeakL` and naive soft-labeling was effective. Results are following.
+![image](./assets/peakl_onehot.png)
 
-### Training Pipeline
+### Tensor-Fusion Pipeline
 We encode audio and text through pre-trained [wav2vec2](https://huggingface.co/kresnik/wav2vec2-large-xlsr-korean) and [Roberta-large](https://huggingface.co/klue/roberta-large). We pool outputs to produce a single column vector for each data and apply outer products to create modality-fused matrix (tensor-fusion). We feed this matrix to [MLP-mixer](https://arxiv.org/abs/2105.01601) to perform both emotion classification and valence & arousal regression. 
 ![image](./assets/pipeline.png)
+Our tensor-fusion is competitive compared to naive simple concatenation not only in feature vector embedding morphology, but also their performance increment was significant under t-test
+![image](./assets/tf_vs_concat.png)
 
 
 - [Multi-modal Emotion Recognition through Tensor Fusion](#multi-modal-emotion-recognition-through-tensor-fusion)
   - [Work Summary](#work-summary)
     - [Emotion Distributions and Learned Embeddings](#emotion-distributions-and-learned-embeddings)
     - [`PeakL` Distributions](#peakl-distributions)
-    - [Training Pipeline](#training-pipeline)
+    - [Tensor-Fusion Pipeline](#tensor-fusion-pipeline)
   - [1. Data](#1-data)
     - [About Data](#about-data)
   - [2. Code](#2-code)
