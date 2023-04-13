@@ -1,29 +1,29 @@
-# Multi-modal Emotion Recognition through Tensor Fusion
-This repository contains codebase for Multi-modal Emotion Recognition through Tensor Fusion. Our contributions as follows
+# Improving Multimodal Emotion Recognition using Tensor Mixer Network and Peaking Labels
+This repository contains codebase for Improving Multimodal Emotion Recognition using Tensor Mixer Network and Peaking Labels. Our contributions as follows: 
+- We predict 7-class emotions and valence & arousal level with multi-modal input: audio and text at the same time, through [**Tensor Mixer Network**](https://aclanthology.org/D17-1115/)
 - We propose `PeakL`, Peaking Labels, to make a peak for flattened/vague multi-rated decisions
-- We predict 7-class emotions and valence & arousal level with multi-modal input: audio and text at the same time, through [**Tensor-Fusion**](https://aclanthology.org/D17-1115/)
-- Our work also discovered that learned embeddings after proposed **Tensor-Fusion** aligns on human-rated valence-arousal maps.
+- Our work also discovered that learned embeddings after proposed **Tensor Mixer Network** aligns on human-rated valence-arousal maps.
 
 ## Work Summary
 ### Emotion Distributions and Learned Embeddings
 - (Left): Human raters valence & arousal emotion cluster maps.
-- (Right): Dimensionality reduction with UMAP of our **Tensor-Fusion** networks last linear layer before classification/regression.
+- (Right): Dimensionality reduction with UMAP of our **Tensor Mixer Network** last linear layer before classification/regression.
 
 One can easily see their emotion clusters are aligned with human rated valence & arousal space.
 ![image](./assets/embed.png)
 
-### Tensor-Fusion Pipeline
+### Tensor Mixer Network Pipeline
 We encode audio and text through pre-trained [wav2vec2](https://huggingface.co/kresnik/wav2vec2-large-xlsr-korean) and [Roberta-large](https://huggingface.co/klue/roberta-large). We pool outputs to produce a single column vector for each data and apply outer products to create modality-fused matrix (tensor-fusion). We feed this matrix to [MLP-mixer](https://arxiv.org/abs/2105.01601) to perform both emotion classification and valence & arousal regression. 
 ![image](./assets/pipeline.png)
-Our tensor-fusion is competitive compared to naive simple concatenation not only in feature vector embedding morphology, but also their performance increment was significant under t-test
+Our Tensor Mixer Network is competitive compared to naive simple concatenation not only in feature vector embedding morphology, but also their performance increment was significant under t-test
 
 | |T|dof|alternative|p-val|CI95%|cohen-d|BF10|power|
 |---|---|---|---|---|---|---|---|---|---|
-|epoch/valid_acc|	5.4178	|4	|two-sided|	0.0056	|[0.0, 0.02]	|0.6438	|10.689	|0.2005|
-|epoch/valid_macrof1|	6.3869	|4|	two-sided|	0.0031|	[0.02, 0.04]|	1.3668	|16.54	|0.6345|
-|epoch/valid_microf1	|5.4178	|4	|two-sided|	0.0056	|[0.0, 0.02]	|0.6438	|10.689|	0.2005|
-|epoch/valid_ccc(aro)	|8.6186	|4	|two-sided	|0.0010	|[0.13, 0.25]	|5.3679	|37.745|	1.0000|
-|epoch/valid_ccc(val)	|7.9099	|4	|two-sided	|0.0014	|[0.09, 0.18]	|3.6925	|29.703	|0.9999|
+|epoch/valid_acc|	5.4178	|4	|two-sided|	**0.0056**	|[0.0, 0.02]	|0.6438	|10.689	|0.2005|
+|epoch/valid_macrof1|	6.3869	|4|	two-sided|	**0.0031**|	[0.02, 0.04]|	1.3668	|16.54	|0.6345|
+|epoch/valid_microf1	|5.4178	|4	|two-sided|	**0.0056**	|[0.0, 0.02]	|0.6438	|10.689|	0.2005|
+|epoch/valid_ccc(aro)	|8.6186	|4	|two-sided	|**0.0010**	|[0.13, 0.25]	|5.3679	|37.745|	1.0000|
+|epoch/valid_ccc(val)	|7.9099	|4	|two-sided	|**0.0014**	|[0.09, 0.18]	|3.6925	|29.703	|0.9999|
 
 ### `PeakL` Distributions
 Below figure represents the distribution before and after applying `PeakL`. Distribution after application are represented in orange and one can observe that these distributions are more left-centered (more certain). Our motivation comes from observation that one-hot classification deters regression performance while using soft-labels with naive raters decision deters classification result.
@@ -32,17 +32,17 @@ Performance comparison between `PeakL` and naive soft-labeling was effective. Re
 
 | |T|dof|alternative|p-val|CI95%|cohen-d|BF10|power|
 |---|---|---|---|---|---|---|---|---|---|
-|epoch/valid_acc|9.7021|4|two-sided|0.0006|[0.01 0.01]|0.4927|52.725|0.1379|
-|epoch/valid_macrof1|11.8231|4|two-sided|0.0003|[0.01 0.02]|0.7127|92.844|0.2342|
-|epoch/valid_microf1|9.7021|4|two-sided|0.0006|[0.01 0.01]|0.4927|52.725|0.1379|
-|epoch/valid_ccc(aro)|1.567|4|two-sided|0.1922|[-0.01  0.02]|0.6379|0.873|0.1977|
-|epoch/valid_ccc(val)|3.6245|4|two-sided|0.0223|[0.   0.02]|0.7926|3.958|0.2768|
+|epoch/valid_acc|9.7021|4|two-sided|**0.0006**|[0.01 0.01]|0.4927|52.725|0.1379|
+|epoch/valid_macrof1|11.8231|4|two-sided|**0.0003**|[0.01 0.02]|0.7127|92.844|0.2342|
+|epoch/valid_microf1|9.7021|4|two-sided|**0.0006**|[0.01 0.01]|0.4927|52.725|0.1379|
+|epoch/valid_ccc(aro)|1.567|4|two-sided|*0.1922*|[-0.01  0.02]|0.6379|0.873|0.1977|
+|epoch/valid_ccc(val)|3.6245|4|two-sided|**0.0223**|[0.   0.02]|0.7926|3.958|0.2768|
 
 
-- [Multi-modal Emotion Recognition through Tensor Fusion](#multi-modal-emotion-recognition-through-tensor-fusion)
+- [Improving Multimodal Emotion Recognition using Tensor Mixer Network and Peaking Labels](#improving-multimodal-emotion-recognition-using-tensor-mixer-network-and-peaking-labels)
   - [Work Summary](#work-summary)
     - [Emotion Distributions and Learned Embeddings](#emotion-distributions-and-learned-embeddings)
-    - [Tensor-Fusion Pipeline](#tensor-fusion-pipeline)
+    - [Tensor Mixer Network Pipeline](#tensor-mixer-network-pipeline)
     - [`PeakL` Distributions](#peakl-distributions)
   - [1. Data](#1-data)
     - [About Data](#about-data)
@@ -50,6 +50,7 @@ Performance comparison between `PeakL` and naive soft-labeling was effective. Re
     - [2.1 Basic Setups](#21-basic-setups)
     - [2.2 Generating Dataset](#22-generating-dataset)
     - [2.3 Start Training](#23-start-training)
+    - [2.4 Reproduce](#24-reproduce)
   - [3. Miscellaneous](#3-miscellaneous)
     - [Fast Dev](#fast-dev)
     - [Testing Functions with `fire`](#testing-functions-with-fire)
@@ -65,10 +66,9 @@ Data contains 3 modalities
 ```
 ./
 ├── README.md
-├── assets
-├── config
-├── data
-├── erc
+├── config/
+├── data/
+├── erc/
 ├── train.py
 ├── requirements.txt
 ├── setup.sh
@@ -77,18 +77,18 @@ Data contains 3 modalities
 
 ```
 ./data
-├── KEMDy19
-│   ├── ECG
-│   ├── EDA
-│   ├── TEMP
-│   ├── annotation
-│   └── wav
-├── KEMDy20_v1_1
-│   ├── EDA
-│   ├── IBI
-│   ├── TEMP
-│   ├── annotation
-│   └── wav
+├── KEMDy19/
+│   ├── ECG/
+│   ├── EDA/
+│   ├── TEMP/
+│   ├── annotation/
+│   └── wav/
+├── KEMDy20_v1_1/
+│   ├── EDA/
+│   ├── IBI/
+│   ├── TEMP/
+│   ├── annotation/
+│   └── wav/
 ```
 
 
@@ -120,6 +120,12 @@ We use hydra for CLI execution of training codes. One can add arguments to overr
 python train.py trainer.accelerator=cpu dataset.validation_fold=3
 ```
 
+### 2.4 Reproduce
+To reproduce the full table in our paper, run the following
+```bash
+(erc) chmod +x reproduce.sh
+(erc) sh reproduce.sh
+```
 
 ## 3. Miscellaneous
 ### Fast Dev
