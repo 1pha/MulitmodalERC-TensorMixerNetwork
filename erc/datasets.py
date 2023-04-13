@@ -1,9 +1,10 @@
 import os
-import random 
+import random
+from typing import List
 
 from pathlib import Path
 from typing import Tuple
-from glob import glob 
+from glob import glob
 
 import hydra
 import datasets
@@ -23,8 +24,8 @@ from erc.constants import (
     gender2idx,
     emotion_va_19_dict,
     emotion_va_20_dict,
-    emotion_va_19_20_dict
 )
+
 
 random.seed(42)
 
@@ -41,7 +42,7 @@ class KEMDBase(Dataset):
         return_bio: bool = False,
         max_length_wav: int = 200_000,
         max_length_txt: int = 50,
-        tokenizer_name: str = "klue/bert-base",
+        tokenizer_name: str = "klue/roberta-large",
         multilabel: bool = False,
         remove_deuce: bool = False,
         validation_fold: int = 4,
@@ -104,29 +105,6 @@ class KEMDBase(Dataset):
         return len(self.df) if not self.num_data else len(self.df[:self.num_data])
 
     def __getitem__(self, idx: int):
-        """ Returns data dictionary.
-        Element specifications
-            sampling_rate:
-                int (e.g. 16_000)
-            wav:
-                torch.int16
-                ndim=1, (max_length_wav,)
-            wav_mask:
-                torch.int64
-                ndim=1, (max_length_wav,)
-            txt:
-                torch.int64
-                ndim=1, (max_length_txt,)
-            txt_mask:
-                torch.int64
-                ndim=1, (max_length_txt,)
-            emotion, gender:
-                torch.int64
-                ndim=0
-            valence, arousal:
-                torch.float32
-                ndim=0
-        """
         row = self.df.iloc[idx]
         segment_id = row["segment_id"]
         data = {"segment_id": segment_id}
@@ -471,66 +449,6 @@ class KEMDy20Dataset(KEMDBase):
         return session, speaker, gender, wav_prefix
 
 
-class KEMDDataset(Dataset):
-    """ Integrated dataset for KEMDy19 and KEMDy20_v1_1
-    Example codes:
-    ```config
-    dataset:
-        _target_: erc.datasets.KEMDDataset
-        return_bio: False
-        validation_fold: 4
-        mode: train
-    ```
-    ```python
-    with hydra.initialize(version_base=None, config_path="./config"):
-        cfg = hydra.compose(config_name="config")
-    dataset = hydra.utils.instantiate(cfg.dataset)
-    dataloader = hydra.utils.instantiate(cfg.dataloader)
-    batch = next(iter(dataloader))
-    ```
-    # TODO: Use `torch.utils.data.ConcatDataset`
-    """
-    def __init__(
-        self,
-        return_bio: bool = False,
-        validation_fold: int = 4,
-        max_length_wav: int = 80_000,
-        max_length_txt: int = 50,
-        tokenizer_name: str = "klue/bert-base",
-        multilabel: bool = False,
-        remove_deuce: bool = True,
-        mode: RunMode | str = RunMode.TRAIN,
-        num_data: int = None,
-    ):
-        logger.info("Instantiate %s Dataset", mode)
-        self.kemdy19 = KEMDy19Dataset(return_bio=return_bio,
-                                      max_length_wav=max_length_wav,
-                                      max_length_txt=max_length_txt,
-                                      tokenizer_name=tokenizer_name,
-                                      multilabel=multilabel,
-                                      remove_deuce=remove_deuce,
-                                      validation_fold=validation_fold,
-                                      mode=mode,
-                                      num_data=num_data)
-        self.kemdy20 = KEMDy20Dataset(return_bio=return_bio,
-                                      max_length_wav=max_length_wav,
-                                      max_length_txt=max_length_txt,
-                                      tokenizer_name=tokenizer_name,
-                                      multilabel=multilabel,
-                                      remove_deuce=remove_deuce,
-                                      validation_fold=validation_fold,
-                                      mode=mode,
-                                      num_data=num_data)
-
-    def __len__(self):
-        return len(self.kemdy19) + len(self.kemdy20)
-
-    def __getitem__(self, idx):
-        if idx < len(self.kemdy19):
-            return self.kemdy19.__getitem__(idx)
-        else:
-            return self.kemdy20.__getitem__(idx - len(self.kemdy19))
-        
 class HF_KEMD:
     def __init__(
         self,
@@ -542,12 +460,12 @@ class HF_KEMD:
         wav_processor: str = "kresnik/wav2vec2-large-xlsr-korean",
         sampling_rate: int = 16_000,
         wav_max_length: int = 112_000, # 16_000 * 7, 7secs duration
-        txt_processor: str = "klue/bert-base",
+        txt_processor: str = "klue/roberta-large",
         txt_max_length: int = 64,
         multilabel: bool = False,
         remove_deuce: bool = True,
         load_from_cache_file: bool = True,
-        num_proc: int = 8,
+        num_proc: int = 1,
         batched: bool = True,
         batch_size: int = 1000, # Not a torch batch_size
         writer_batch_size: int = 1000,
@@ -575,6 +493,7 @@ class HF_KEMD:
             self.ds = datasets.load_from_disk(ds_name)
             logger.info("Successfully loaded %s from disk", ds_name)
             logger.info("# Datapoints %s", len(self))
+
         except FileNotFoundError:
             if os.path.exists(ds_name):
                 logger.warn("Was not able to load %s. Please check dataset path", ds_name)
@@ -589,7 +508,7 @@ class HF_KEMD:
                 # Note for hard-coded kwargs
                 generate_csv=False,
                 return_bio=False,
-                tokenizer_name=None,
+                tokenizer_name=None, # Tokenization after loading torch dataset
                 max_length_wav=wav_max_length,
                 max_length_txt=txt_max_length,
                 multilabel=multilabel,
@@ -635,9 +554,7 @@ class HF_KEMD:
             self.map_kwargs = dict(
                 batched=batched,
                 batch_size=batch_size,
-                writer_batch_size=writer_batch_size,
                 desc=f"Pre-process wave & text {mode}",
-                load_from_cache_file=load_from_cache_file,
                 num_proc=num_proc,
             )
             if preprocess:
@@ -665,7 +582,7 @@ class HF_KEMD:
         batch["txt_mask"] = txt["attention_mask"]
         return batch
 
-    def _load_dataset(self, path, **kwargs):
+    def _load_dataset(self, path: str | Path, **kwargs):
         ds: torch.utils.data.Dataset = {
             "kemdy19": KEMDy19Dataset,
             "kemdy20": KEMDy20Dataset,
@@ -675,7 +592,7 @@ class HF_KEMD:
         logger.info("Sample data %s", ds[0])
         return ds
 
-    def load_dataset(self, paths, **kwargs):
+    def load_dataset(self, paths: List[str | Path], **kwargs):
         try:
             paths = paths.split("-")
             logger.info("Loading PyTorch dataset.")
@@ -695,12 +612,10 @@ class AIHubDialog(KEMDBase):
     Also, there are no arousal, valence score in the ai-hub dataset i.e. only can interprete txt, wav 
     '''
     NAME = "AIHubDialog"
-    # PRETRAINED_DATA_PATH = '/home/hoesungryu/workspace/AI-Hub_emotion_dialog'
-    def __init__(
-            self, 
-            PRETRAINED_DATA_PATH: str | Path,
-            mode : str,
-            **kwargs):
+    def __init__(self, 
+                 PRETRAINED_DATA_PATH: str | Path,
+                 mode: str,
+                 **kwargs):
         self.txt_folder_total = sorted(glob(os.path.join(PRETRAINED_DATA_PATH, 'annotation')+'/*.csv'))
         self.wav_folder_total = sorted(glob(os.path.join(PRETRAINED_DATA_PATH, 'wav')+'/*.wav'))
         self.max_length_wav = None
@@ -731,14 +646,14 @@ class AIHubDialog(KEMDBase):
         data["wav"] = wav
         data["wav_mask"] = wav_mask
 
-        # Arousal / Valence ;
+        # Arousal / Valence
         data["arousal"] = 0
         data["valence"] = 0
 
         return data
 
     @staticmethod
-    def sampling_with_ratio(total_len : int, mode : str, train_ratio = 0.8) -> list[int]:
+    def sampling_with_ratio(total_len: int, mode: str, train_ratio = 0.8) -> list[int]:
         '''
             Using Numpy sample, we split the train valid with train_ratio
         '''

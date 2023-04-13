@@ -1,3 +1,4 @@
+pytorch-lightning==1.9.4
 flake8
 black
 jupyter
@@ -8,7 +9,6 @@ hydra-core
 matplotlib
 seaborn
 tqdm
-pytorch-lightning
 torchmetrics
 transformers==4.26.1
 scipy

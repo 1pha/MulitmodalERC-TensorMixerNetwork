@@ -1,13 +1,13 @@
-""" Training Sequence with wav data only
+""" [Outdated] Training Sequence with wav data only
 """
 import torch
+import torch.nn as nn
 from transformers import Wav2Vec2ForSequenceClassification
 
-from .model_base import ModelBase
 from erc.constants import Task
 
 
-class WavCls(ModelBase):
+class WavCls(nn.Module):
     TASK = Task.CLS
     def __init__(self, config: str, criterion: torch.nn.Module, config_kwargs: dict = None):
         super().__init__()
@@ -27,7 +27,7 @@ class WavCls(ModelBase):
         }
 
 
-class WavOnly(ModelBase):
+class WavOnly(nn.Module):
     TASK = Task.ALL
     def __init__(
         self,
