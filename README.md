@@ -48,9 +48,10 @@ Performance comparison between `PeakL` and naive soft-labeling was effective. Re
     - [About Data](#about-data)
   - [2. Code](#2-code)
     - [2.1 Basic Setups](#21-basic-setups)
-    - [2.2 Generating Dataset](#22-generating-dataset)
-    - [2.3 Start Training](#23-start-training)
-    - [2.4 Reproduce](#24-reproduce)
+    - [2.2 Start Training](#22-start-training)
+      - [Cold start](#cold-start)
+      - [Configure Training](#configure-training)
+    - [2.3 Reproduce](#23-reproduce)
   - [3. Miscellaneous](#3-miscellaneous)
     - [Fast Dev](#fast-dev)
     - [Testing Functions with `fire`](#testing-functions-with-fire)
@@ -102,14 +103,18 @@ Data contains 3 modalities
 ```
 - Put data and the source code on the same hierarchy. Prevent hard copy and use soft-link instead: `ln -s ACTUAL_DATA_PATH data`
 
-### 2.2 Generating Dataset
-We recommend our **dataset to be created before training** (It is possible to train end-to-end with `train.py` script only). We use [`huggingface dataset`](https://huggingface.co/docs/datasets/index) and `.map` function from this library sometimes provokes an unknown error that does not start pre-processing or gets deadlocked when using `num_proc > 1` for multiprocessing. Dataset creation can be done via following commands
+### 2.2 Start Training
+#### Cold start
+Easy way to start our training code without configuration changes.
+```zsh
+sh train.sh
+```
+#### Configure Training
+We recommend our **dataset to be created before training** (It is possible to train end-to-end with `train.py` script only). We use [`huggingface dataset`](https://huggingface.co/docs/datasets/index) and `.map` function from this library sometimes provokes an unknown error that does not start pre-processing or gets deadlocked when using `num_proc > 1` for multiprocessing. Dataset creation can be done via following commands:
 ```zsh
 python -m fire erc.datasets HF_KEMD --mode=train --validation_fold=${valfold}
 python -m fire erc.datasets HF_KEMD --mode=valid --validation_fold=${valfold}
 ```
-
-### 2.3 Start Training
 With default configuration runs with [config/train.yaml](./config/train.yaml)
 ```zsh
 python train.py
@@ -120,7 +125,7 @@ We use hydra for CLI execution of training codes. One can add arguments to overr
 python train.py trainer.accelerator=cpu dataset.validation_fold=3
 ```
 
-### 2.4 Reproduce
+### 2.3 Reproduce
 To reproduce the full table in our paper, run the following
 ```bash
 (erc) chmod +x reproduce.sh
