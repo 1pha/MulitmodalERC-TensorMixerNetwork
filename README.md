@@ -40,9 +40,6 @@ Our tensor-fusion is competitive compared to naive simple concatenation not only
     - [Fast Dev](#fast-dev)
     - [Testing Functions with `fire`](#testing-functions-with-fire)
   - [3. Reference](#3-reference)
-    - [Pre-trained Models](#pre-trained-models)
-      - [`.wav`](#wav)
-      - [`.txt`](#txt)
 
 
 ## 1. Data
@@ -122,13 +119,7 @@ python train.py +trainer.fast_dev_run=True
 ```
 
 ### Testing Functions with `fire`
-One may need to test a specific function on CLI. Writing an extra script for such temporal task is very nagging. Use **`fire` library** to boost-up productivity.
-
-* Merge `.csv`
-    For example, if one needs to test [`preprocess.make_total_df`](erc/preprocess.py) on CLI, try the following,
-    ```zsh
-    (erc) python -m fire erc.preprocess make_total_df --base_path="./data/KEMDy19"
-    ```
+One may need to test a specific function on CLI. Writing an extra script for such temporal task is very nagging. Use **`fire` library** to boost-up productivity. For example,
 * Create huggingface `datasets`
     ```zsh
     (erc) python -m fire erc.datasets HF_KEMD --dataset_name="kemdy19"

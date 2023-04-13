@@ -38,8 +38,7 @@ module:
   
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
-  project: RobertaL Final
-  entity: etri-erc
+  project: team-mixer
   name: RobertaL
 
 # https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html

@@ -9,10 +9,9 @@ read -p "Enter num_proc(num_threads) to preprocess datasets [8]: " num_proc
 num_proc=${num_proc:-1}
 
 echo "Start training with device=${device}"
-CUDA_VISIBLE_DEVICES=${device} python train.py dataset.validation_fold=${fold}\
+CUDA_VISIBLE_DEVICES=${device} python train.py dataset.validation_fold=${valfold}\
                                                dataset.num_proc=${num_proc}\
                                                dataset.multilabel=True\
                                                dataset.remove_deuce=False\
                                                +model.use_peakl=True\
-                                               model=simple_concat\
-                                               logger.name="Concat | peakl"
+                                               model=mlp_mixer_roberta
