@@ -26,7 +26,9 @@ Our Tensor Mixer Network is competitive compared to naive simple concatenation n
 |epoch/valid_ccc(val)	|7.9099	|4	|two-sided	|**0.0014**	|[0.09, 0.18]	|3.6925	|29.703	|0.9999|
 
 ### `PeakL` Distributions
-Below figure represents the distribution before and after applying `PeakL`. Distribution after application are represented in orange and one can observe that these distributions are more left-centered (more certain). Our motivation comes from observation that one-hot classification deters regression performance while using soft-labels with naive raters decision deters classification result.
+Below figure represents the distribution before and after applying `PeakL` as below:
+$$ y^{PeakL} =1/(1-r)\times min⁡(0,y^{soft}-\frac{r}{K})$$
+Distribution after application are represented in orange and one can observe that these distributions are more left-centered (more certain). Our motivation comes from observation that one-hot classification deters regression performance while using soft-labels with naive raters decision deters classification result.
 ![image](./assets/peakl.png)
 Performance comparison between `PeakL` and naive soft-labeling was effective. Results are following.
 
