@@ -1,4 +1,4 @@
-echo "Note that training with thie shell script CANNOT fix configurations through CLI."
+echo "Note that training with this shell script CANNOT fix configurations through CLI."
 read -p "Enter validation fold [4]: " valfold
 valfold=${valfold:-4}
 
