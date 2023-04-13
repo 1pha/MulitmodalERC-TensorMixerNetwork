@@ -28,7 +28,7 @@ Our Tensor Mixer Network is competitive compared to naive simple concatenation n
 ### `PeakL` Distributions
 Below figure represents the distribution before and after applying `PeakL` as below:
 
-$$ y^{PeakL} = \frac{1}{1-r}\times min⁡(0, y^{soft}-\frac{r}{K})$$
+$$y^{PeakL} = \frac{1}{1-r}\times min⁡(0, y^{soft}-\frac{r}{K}) \textrm{, where } r=-tanh(\Sigma{{y_i}{log⁡( y_i)}} \textrm{ and } K= \textrm{ total Emotions}$$
 
 Distribution after application are represented in orange and one can observe that these distributions are more left-centered (more certain). Our motivation comes from observation that one-hot classification deters regression performance while using soft-labels with naive raters decision deters classification result.
 ![image](./assets/peakl.png)
