@@ -105,9 +105,10 @@ Data contains 3 modalities
 
 ### 2.2 Start Training
 #### Cold start
-Easy way to start our training code without configuration changes.
+Easy way to start our training code without configuration changes. Please note that it takes around **6-7 hours on a single RTX 3080**
 ```zsh
-sh train.sh
+(erc) chmod +x train.sh
+(erc) sh train.sh
 ```
 #### Configure Training
 We recommend our **dataset to be created before training** (It is possible to train end-to-end with `train.py` script only). We use [`huggingface dataset`](https://huggingface.co/docs/datasets/index) and `.map` function from this library sometimes provokes an unknown error that does not start pre-processing or gets deadlocked when using `num_proc > 1` for multiprocessing. Dataset creation can be done via following commands:
