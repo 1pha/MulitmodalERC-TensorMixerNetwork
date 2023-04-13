@@ -3,8 +3,7 @@
 export CUDA_VISIBLE_DEVICES=1
 export HYDRA_FULL_ERROR=1
 
-
-Ppeakl 
+# Ppeakl 
 for fold in $(seq 0 4) # k-fold
 do
     python train.py dataset.validation_fold=${fold}\
