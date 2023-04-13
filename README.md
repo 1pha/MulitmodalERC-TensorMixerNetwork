@@ -18,7 +18,7 @@ We encode audio and text through pre-trained [wav2vec2](https://huggingface.co/k
 Our Tensor Mixer Network is competitive compared to naive simple concatenation not only in feature vector embedding morphology, but also their performance increment was significant under t-test
 
 | |T|dof|alternative|p-val|CI95%|cohen-d|BF10|power|
-|---|---|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|---|
 |epoch/valid_acc|	5.4178	|4	|two-sided|	**0.0056**	|[0.0, 0.02]	|0.6438	|10.689	|0.2005|
 |epoch/valid_macrof1|	6.3869	|4|	two-sided|	**0.0031**|	[0.02, 0.04]|	1.3668	|16.54	|0.6345|
 |epoch/valid_microf1	|5.4178	|4	|two-sided|	**0.0056**	|[0.0, 0.02]	|0.6438	|10.689|	0.2005|
@@ -31,7 +31,7 @@ Below figure represents the distribution before and after applying `PeakL`. Dist
 Performance comparison between `PeakL` and naive soft-labeling was effective. Results are following.
 
 | |T|dof|alternative|p-val|CI95%|cohen-d|BF10|power|
-|---|---|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|---|
 |epoch/valid_acc|9.7021|4|two-sided|**0.0006**|[0.01 0.01]|0.4927|52.725|0.1379|
 |epoch/valid_macrof1|11.8231|4|two-sided|**0.0003**|[0.01 0.02]|0.7127|92.844|0.2342|
 |epoch/valid_microf1|9.7021|4|two-sided|**0.0006**|[0.01 0.01]|0.4927|52.725|0.1379|
