@@ -31,7 +31,7 @@ Below figure represents the distribution before and after applying `PeakL` as be
 $$y^{PeakL} = \frac{1}{1-r}\times min⁡(0, y^{soft}-\frac{r}{K}) \textrm{, where } r=-tanh(\Sigma{{y_i}{log⁡( y_i)}} \textrm{ and } K= \textrm{ total Emotions}$$
 
 Distribution after application are represented in orange and one can observe that these distributions are more left-centered (more certain). Our motivation comes from observation that one-hot classification deters regression performance while using soft-labels with naive raters decision deters classification result.
-![image](./assets/peakl_arros.svg)
+![image](./assets/peakl_arrows.svg)
 
 | |T|dof|alternative|p-val|CI95%|cohen-d|BF10|power|
 |---|---|---|---|---|---|---|---|---|
