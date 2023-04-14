@@ -27,7 +27,7 @@ Our Tensor Mixer Network is competitive compared to naive simple concatenation n
 
 ### `PeakL` Distributions
 Below figure represents the distribution before and after applying `PeakL`. Distribution after application are represented in orange and one can observe that these distributions are more left-centered (more certain). Our motivation comes from observation that one-hot classification deters regression performance while using soft-labels with naive raters decision deters classification result.
-![image](./assets/peakl.png)
+![image](./assets/peakl_arrow.svg)
 Performance comparison between `PeakL` and naive soft-labeling was effective. Results are following.
 
 | |T|dof|alternative|p-val|CI95%|cohen-d|BF10|power|
