@@ -27,12 +27,9 @@ class CrossAttentionRoberta(nn.Module):
         self.wav_model = Wav2Vec2ForSequenceClassification.from_pretrained(config['wav'])
         self.txt_model = RobertaForSequenceClassification.from_pretrained(config['txt'])
 
-        proj_size = self.wav_model.config.classifier_proj_size
-        self.wav_projector = nn.Linear(self.wav_model.config.hidden_size, proj_size)
         last_hdn_size = {
             "klue/roberta-base": 768, "klue/roberta-large": 1024
         }[config["txt"]]
-        self.txt_projector = nn.Linear(last_hdn_size, proj_size)
         
         # Cross Attention
         cross_attn_config = dict(embed_dim=last_hdn_size,
