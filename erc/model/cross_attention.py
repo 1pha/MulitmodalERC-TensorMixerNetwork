@@ -113,11 +113,11 @@ class CrossAttentionRoberta(nn.Module):
         txt = txt.permute(1, 0, 2) # (S, B, RoBERTa_hidden_dim)
 
         # Cross Attention
-        # (B, 1 , WAV_proj_size, BERT_proj_size)
-        cross_w2t = self.wav2txt(wav, txt, txt).permute(1, 2, 0) 
-        cross_w2t = self.avgpool(cross_w2t)
-        cross_w2t = cross_w2t.squeeze()
-        cross_t2w = self.txt2wav(txt, wav, wav).permute(1, 0, 2)[:, 0, :]
+        cross_w2t = self.wav2txt(wav, txt, txt).permute(1, 2, 0) # (B, proj_size, seq_len)
+        cross_w2t = self.avgpool(cross_w2t) # (B, proj_size)
+        cross_w2t = cross_w2t.squeeze(dim=-1)
+        cross_t2w = self.txt2wav(txt, wav, wav).permute(1, 0, 2) # (B, seq_len, proj_size)
+        cross_t2w = cross_t2w[:, 0, :] # (B, proj_size), cls_token only
         
         output = torch.cat([cross_w2t, cross_t2w], dim=1)
         logits = self.classifier(output)
