@@ -4,51 +4,39 @@ This repository contains codebase for Improving Multimodal Emotion Recognition u
 - We propose `PeakL`, Peaking Labels, to make a peak for flattened/vague multi-rated decisions
 - Our work also discovered that learned embeddings after proposed **Tensor Mixer Network** aligns on human-rated valence-arousal maps.
 
+---
 ## Work Summary
-### Emotion Distributions and Learned Embeddings
+### 1. Emotion Distributions and Learned Embeddings
+One can easily see their emotion clusters are aligned with human rated valence & arousal space.
+![image](./assets/embed.png)
 - (Left): Human raters valence & arousal emotion cluster maps.
 - (Right): Dimensionality reduction with UMAP of our **Tensor Mixer Network** last linear layer before classification/regression.
 
-One can easily see their emotion clusters are aligned with human rated valence & arousal space.
-![image](./assets/embed.png)
 
-### Tensor Mixer Network Pipeline
-We encode audio and text through pre-trained [wav2vec2](https://huggingface.co/kresnik/wav2vec2-large-xlsr-korean) and [Roberta-large](https://huggingface.co/klue/roberta-large). We pool outputs to produce a single column vector for each data and apply outer products to create modality-fused matrix (tensor-fusion). We feed this matrix to [MLP-mixer](https://arxiv.org/abs/2105.01601) to perform both emotion classification and valence & arousal regression. 
+### 2. Tensor Mixer Network (TMN)
+1. We encode audio and text through pre-trained [wav2vec2](https://huggingface.co/kresnik/wav2vec2-large-xlsr-korean) and [Roberta-large](https://huggingface.co/klue/roberta-large). We pool outputs to produce a single column vector for each data and apply outer products to create modality-fused matrix (tensor-fusion). We feed this matrix to [MLP-mixer](https://arxiv.org/abs/2105.01601) to perform both emotion classification and valence & arousal regression. 
 ![image](./assets/pipeline.png)
-Our Tensor Mixer Network is competitive compared to naive simple concatenation not only in feature vector embedding morphology, but also their performance increment was significant under t-test
 
-| |T|dof|alternative|p-val|CI95%|cohen-d|BF10|power|
-|---|---|---|---|---|---|---|---|---|
-|epoch/valid_acc|	5.4178	|4	|two-sided|	**0.0056**	|[0.0, 0.02]	|0.6438	|10.689	|0.2005|
-|epoch/valid_macrof1|	6.3869	|4|	two-sided|	**0.0031**|	[0.02, 0.04]|	1.3668	|16.54	|0.6345|
-|epoch/valid_microf1	|5.4178	|4	|two-sided|	**0.0056**	|[0.0, 0.02]	|0.6438	|10.689|	0.2005|
-|epoch/valid_ccc(aro)	|8.6186	|4	|two-sided	|**0.0010**	|[0.13, 0.25]	|5.3679	|37.745|	1.0000|
-|epoch/valid_ccc(val)	|7.9099	|4	|two-sided	|**0.0014**	|[0.09, 0.18]	|3.6925	|29.703	|0.9999|
+2. Our Tensor Mixer Network (TMN) is competitive compared to other concatenation method in feature vector fusion morphology.
 
-### `PeakL` Distributions
-Below figure represents the distribution before and after applying `PeakL` as below:
+|Fusion Method|Weighted-F1|Micro-F1|CCC(aro)|CCC(val)|
+|:------|:----:|:--:|:--:|:--:|
+|Concatenation|.827±0.017|.840±0.016|.578±0.115|.688±0.068|
+|Cross-attention|.837±0.015|.848±0.016|.810±0.035|.850±0.014|
+|**TMN (proposed)**|.844±0.015|.851±0.018|.813±0.011|.857±0.011|  
 
-$$y^{PeakL} = \frac{1}{1-r}\times min⁡(0, y^{soft}-\frac{r}{K}) \textrm{, where } r=-\textrm{tanh}(\Sigma{{y_i}{log⁡( y_i)}}) \textrm{ and } K= \textrm{ total Emotions}$$
-
-Distribution after application are represented in orange and one can observe that these distributions are more left-centered (more certain). Our motivation comes from observation that one-hot classification deters regression performance while using soft-labels with naive raters decision deters classification result.
-![image](./assets/peakl_arrow.svg)
-
-| |T|dof|alternative|p-val|CI95%|cohen-d|BF10|power|
-|---|---|---|---|---|---|---|---|---|
-|epoch/valid_acc|9.7021|4|two-sided|**0.0006**|[0.01 0.01]|0.4927|52.725|0.1379|
-|epoch/valid_macrof1|11.8231|4|two-sided|**0.0003**|[0.01 0.02]|0.7127|92.844|0.2342|
-|epoch/valid_microf1|9.7021|4|two-sided|**0.0006**|[0.01 0.01]|0.4927|52.725|0.1379|
-|epoch/valid_ccc(aro)|1.567|4|two-sided|*0.1922*|[-0.01  0.02]|0.6379|0.873|0.1977|
-|epoch/valid_ccc(val)|3.6245|4|two-sided|**0.0223**|[0.   0.02]|0.7926|3.958|0.2768|
+### 3. Peaking Lables (PeakL)
+1. The below equation refers to `PeakL`: $$y^{PeakL} = max(0, y^{soft}-\frac{r}{K})$$ where $r=-\textrm{tanh}(\Sigma{{y^{soft}}{log⁡(y^{soft})}})$ and $K$ is the number of total emotions.
 
 
+2. Distribution after application are represented in orange and one can observe that these distributions are more left-centered (more certain). Our motivation comes from observation that one-hot classification deters regression performance while using soft-labels with naive raters decision deters classification result.![image](./assets/peakl_arrow.svg)
+
+3. Below figure indicates the distribution before and after applying `PeakL`. <img src='./assets/peakl_ba.png' width=90%>
+
+## Pytorch codebase
+### Contents
 - [Improving Multimodal Emotion Recognition using Tensor Mixer Network and Peaking Labels](#improving-multimodal-emotion-recognition-using-tensor-mixer-network-and-peaking-labels)
-  - [Work Summary](#work-summary)
-    - [Emotion Distributions and Learned Embeddings](#emotion-distributions-and-learned-embeddings)
-    - [Tensor Mixer Network Pipeline](#tensor-mixer-network-pipeline)
-    - [`PeakL` Distributions](#peakl-distributions)
-  - [1. Data](#1-data)
-    - [About Data](#about-data)
+  - [1. Code Structure](#1.-Code-Structure)
   - [2. Code](#2-code)
     - [2.1 Basic Setups](#21-basic-setups)
     - [2.2 Start Training](#22-start-training)
@@ -60,9 +48,7 @@ Distribution after application are represented in orange and one can observe tha
     - [Testing Functions with `fire`](#testing-functions-with-fire)
   - [3. Reference](#3-reference)
 
-
-## 1. Data
-### About Data
+## 1. Code Structure
 Data contains 3 modalities
 - `.wav`: Audio file
 - `.txt`: Script of an audio
@@ -154,6 +140,18 @@ One may need to test a specific function on CLI. Writing an extra script for suc
     (erc) python -m fire erc.datasets HF_KEMD --dataset_name="kemdy19"
     ```
 
-## 3. Reference
+## Reference
 * [Model info](./erc/model/README.md)
 * [Competition Links](https://aifactory.space/competition/detail/2234)
+
+---
+## Citation
+If you find this repository useful in your research, please consider giving a star ⭐ and a citation
+```bibtex
+@inproceedings{PeakL2023,
+  title={Improving Multimodal Emotion Recognition using Tensor Mixer Network and Peaking Labels},
+  author={Daehyun Cho, Hoe Sung Ryu, Christian Wallraven},
+  booktitle={Proceedings of the Korean Information Science Society Conference},
+  year={2023}
+}
+```
