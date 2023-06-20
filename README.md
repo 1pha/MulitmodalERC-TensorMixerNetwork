@@ -7,8 +7,7 @@ This repository contains codebase for Improving Multimodal Emotion Recognition u
 ---
 ## Work Summary
 ### 1. Emotion Distributions and Learned Embeddings
-One can easily see their emotion clusters are aligned with human rated valence & arousal space.
-![image](./assets/embed.png)
+One can easily see their emotion clusters are aligned with human rated valence & arousal space. ![image](./assets/embed.png)
 - (Left): Human raters valence & arousal emotion cluster maps.
 - (Right): Dimensionality reduction with UMAP of our **Tensor Mixer Network** last linear layer before classification/regression.
 
@@ -148,7 +147,7 @@ One may need to test a specific function on CLI. Writing an extra script for suc
 ## Citation
 If you find this repository useful in your research, please consider giving a star ⭐ and a citation
 ```bibtex
-@inproceedings{PeakL2023,
+@article{PeakL2023,
   title={Improving Multimodal Emotion Recognition using Tensor Mixer Network and Peaking Labels},
   author={Daehyun Cho, Hoe Sung Ryu, Christian Wallraven},
   booktitle={Proceedings of the Korean Information Science Society Conference},
